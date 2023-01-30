@@ -104,10 +104,14 @@ def cluster_statistics(indices, nivel, n_generado_de_clusters):
 
         stat = {
             'n_elementos' : len(cluster_elements),
-            'profit_mean' : cluster_elements.profit.mean(),
-            'cost_mean' : cluster_elements.cost.mean(),
+            'profit_min': cluster_elements.profit.min(),
+            'profit_median' : cluster_elements.profit.median(),
+            'profit_max': cluster_elements.profit.max(),
             'profit_SD' : cluster_elements.profit.std(),
-            'cost_SD' : cluster_elements.cost.std()
+            'cost_min' : cluster_elements.cost.min(),
+            'cost_median': cluster_elements.cost.median(),
+            'cost_max': cluster_elements.cost.max(),
+            'cost_SD': cluster_elements.cost.std(),
             }
 
         estadisticos[c] = stat
@@ -178,29 +182,29 @@ def algoritmo_clustering(indices, n_deseado_de_clusters, nivel):
     """
     global data
 
-    time_1 = datetime.now()
+    #time_1 = datetime.now()
 
     
     # filter rows and columns according to indices
     dist_matrix_filtrada = pd.DataFrame.to_numpy((pd.DataFrame(get_distance_matrix())).loc[indices, indices])
 
-    time_2 = datetime.now()
-    time_diff = time_2 - time_1
-    print(time_diff)
+    #time_2 = datetime.now()
+    #time_diff = time_2 - time_1
+    #print(time_diff)
 
     # get linkage matrix for hierarchical clustering
     linkage_matrix = linkage(dist_matrix_filtrada, method="complete")
 
-    time_3 = datetime.now()
-    time_diff = time_3 - time_2
-    print(time_diff)
+    #time_3 = datetime.now()
+    #time_diff = time_3 - time_2
+    #print(time_diff)
 
     # get clusters
     clusters = fcluster(linkage_matrix, n_deseado_de_clusters, criterion='maxclust')
 
-    time_4 = datetime.now()
-    time_diff = time_4 - time_3
-    print(time_diff)
+    #time_4 = datetime.now()
+    #time_diff = time_4 - time_3
+    #print(time_diff)
 
     n_generado_de_clusters = len(set(clusters))
 
@@ -242,9 +246,9 @@ def plot_all(nivel, n_deseado_de_clusters, array_filtros):
     wcstk = plot_wordclouds(indices, "stks", stakeholders, nivel)
 
     estadisticos = cluster_statistics(indices, nivel, n_generado_de_clusters)
-    stat = {1: "", 2: "", 3: "", 4: ""}
+    stat = {1: "", 2: "", 3: "", 4: "", 5: "", 6: "", 7: "", 8: ""}
     for clus in range(1, n_generado_de_clusters+1):
-        stat[clus] = "Cluster {}\nElement count: {}\nProfit mean:   {}\nProfit SD:     {}\nCost mean:     {}\nCost SD:       {}".format(clus, estadisticos[clus]['n_elementos'], estadisticos[clus]['profit_mean'], estadisticos[clus]['profit_SD'], estadisticos[clus]['cost_mean'], estadisticos[clus]['cost_SD'])
+        stat[clus] = "Cluster {}\nElement count:\t{}\nProfit min:\t{}\nProfit median:\t{}\nProfit max:\t{}\nProfit SD:\t{}\nCost min:\t{}\nCost median:\t{}\nCost max:\t{}\nCost SD:\t{}".format(clus, estadisticos[clus]['n_elementos'], estadisticos[clus]['profit_min'], estadisticos[clus]['profit_median'], estadisticos[clus]['profit_max'], estadisticos[clus]['profit_SD'], estadisticos[clus]['cost_min'],estadisticos[clus]['cost_median'], estadisticos[clus]['cost_max'], estadisticos[clus]['cost_SD'])
 
     pcg = px.scatter(data.loc[indices], x="profit", y="cost", color=("Level {}".format(nivel)), hover_data=['id'])
     pcg.update_layout(coloraxis_showscale=False, margin=dict(l=0, r=0, b=0, t=0))
