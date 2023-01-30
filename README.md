@@ -2,9 +2,11 @@
 Clustering-Based Pareto Front Exploration Software
 
 # Authors: 
-- Rottoli, Giovanni Daián 
 - Casanova, Carlos
+- Rottoli, Giovanni Daián 
+- Schab, Esteban
 - Federico, Facundo
+- Prado, Lucas
 
 # Institution:
 - Universidad Tecnológica Nacional, Facultad Regional Concepción del Uruguay.
