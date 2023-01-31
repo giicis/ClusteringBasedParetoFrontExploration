@@ -243,11 +243,12 @@ def algoritmo_clustering(indices, n_deseado_de_clusters, nivel):
 
     return linkage_matrix, n_generado_de_clusters
 
-def plot_all(nivel, n_deseado_de_clusters, array_filtros):
+def plot_all(nivel, n_deseado_de_clusters, array_filtros, y_axis_bp):
     """
     Runs the clustering algorithm and generates a dendogram, cluster statistics and wordclouds, and a dispersion graph.
     :param nivel: level of clustering zoom.
     :n_deseado_de_clusters: maximum number of clusters to be generated.
+    :y_axis_bp: y-axis of box plot.
     :return: control variables, graphs to be displayed.
     """
     global data
@@ -281,12 +282,14 @@ def plot_all(nivel, n_deseado_de_clusters, array_filtros):
     pcg = px.scatter(data.loc[indices], x="profit", y="cost", color=("Level {}".format(nivel)), hover_data=['id'])
     pcg.update_layout(coloraxis_showscale=False, margin=dict(l=0, r=0, b=0, t=0))
 
+    bxp = px.box(data.loc[indices], x="Level {}".format(nivel), y=y_axis_bp)
+
     #Disable zoomin if there are no clusters to choose
     deshabilitar_zoomin = (n_generado_de_clusters<=1)
     #You can't zoom in a cluster with less than 3 solutions
     options = [{'label': 'Cluster{}'.format(c), 'value': c, 'disabled': (estadisticos[c]['n_elementos'] <= 2)} for c in range(1, n_generado_de_clusters+1)]
     
-    return (error, deshabilitar_zoomin, options, dn, wcreq[0], wcreq[1], wcreq[2], wcreq[3], stat[1], stat[2], stat[3], stat[4], wcstk[0], wcstk[1], wcstk[2], wcstk[3], pcg)
+    return (error, deshabilitar_zoomin, options, dn, wcreq[0], wcreq[1], wcreq[2], wcreq[3], stat[1], stat[2], stat[3], stat[4], wcstk[0], wcstk[1], wcstk[2], wcstk[3], pcg, bxp)
 
 def obtener_indices(nivel):
     """
@@ -466,23 +469,26 @@ def start(n_clicks, content):
      Output(component_id='wordcloud_stk_cluster2',  component_property='figure'),
      Output(component_id='wordcloud_stk_cluster3',  component_property='figure'),
      Output(component_id='wordcloud_stk_cluster4',  component_property='figure'),
-     Output(component_id='profit_cost_graph',       component_property='figure')],
+     Output(component_id='profit_cost_graph',       component_property='figure'),
+     Output(component_id='box_plot_graph',          component_property='figure')],
 
     [ Input(component_id='btn-restore',             component_property='n_clicks'),
       Input(component_id='btn-zoomout',             component_property='n_clicks'),
       Input(component_id='btn-zoomin',              component_property='n_clicks'),
       Input(component_id='slider_num_clusters',     component_property='value'),
-      Input(component_id='filtros-dropdown',        component_property='value')],
+      Input(component_id='filtros-dropdown',        component_property='value'),
+      Input(component_id='y-axis-boxplot',          component_property='value')],
     [ State(component_id='cluster_seleccionado',    component_property='value'),
       State(component_id='slider_nivel',            component_property='marks'),
       State(component_id='slider_nivel',            component_property='value')]
 )
-def update_graphs(n_clicks_restore, n_clicks_out, n_clicks_in, num_clusters, keys, option_slctd, marcas_de_nivel, nivel):
+def update_graphs(n_clicks_restore, n_clicks_out, n_clicks_in, num_clusters, keys, y_axis, option_slctd, marcas_de_nivel, nivel):
     """
     Callback function used to update the graphs.
     :n_clicks_out: number of clicks on the "zoom out" button.
     :n_clicks_in: number of clicks on the "zoom in" button.
     :num_clusters: maximum number of clusters to be generated.
+    :y_axis: y-axis of box plot.
     :option_slctd: cluster selected to zoom in.
     :marcas_de_nivel: marks in the clustering zoom level slider.
     :param nivel: level of clustering zoom.
@@ -521,7 +527,7 @@ def update_graphs(n_clicks_restore, n_clicks_out, n_clicks_in, num_clusters, key
     deshab_zoomout = (nivel==0)
 
     # Plot
-    return (None, marcas_de_nivel, nivel, deshab_restore, deshab_zoomout, palabras_clave) + plot_all(nivel, num_clusters, array_filtros)
+    return (1, marcas_de_nivel, nivel, deshab_restore, deshab_zoomout, palabras_clave) + plot_all(nivel, num_clusters, array_filtros, y_axis)
 
 #______________________________________________________________________________
 

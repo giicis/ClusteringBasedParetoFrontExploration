@@ -59,10 +59,11 @@ main_layout = html.Div([
             html.Button('Zoom in', id='btn-zoomin', style={'font-family' : 'helvetica', 'width': "33%", 'height': "20%"}, disabled=False),
             dcc.RadioItems(
                 id="cluster_seleccionado",
+                value=1,
                 # list comprehension to save time avoiding loops
-                options=[{'label': 'Cluster{}'.format(c), 'value': str(c)} for c in range(1, MAXCLUST + 1)],
+                options=[{'label': 'Cluster{}'.format(c), 'value': c} for c in range(1, MAXCLUST + 1)],
                 labelStyle={'display': 'inline-block'},
-                value=1
+                inline=True
                 ),
             html.Br(),
             html.Div(children='Desired number of clusters', style={'text-align': 'left'}),
@@ -98,6 +99,17 @@ main_layout = html.Div([
 
     html.Hr(),
     html.H3("Cluster metadata", style={'text-align': 'center'}),
+    html.P("Box plot graph", style={'text-align': 'left'}),
+    html.Div([
+    html.P("y-axis:"),
+        dcc.RadioItems(
+            id='y-axis-boxplot',
+            options=['profit', 'cost'],
+            value='profit',
+            inline=True
+        ),
+        dcc.Graph(id='box_plot_graph', figure={})
+    ], style={'columnCount': 1}),
     html.Div([
         dcc.Textarea(id="textarea_cluster1", value="", rows=6, readOnly=True, style={'width' : "100%"}),
         dcc.Graph(id='wordcloud_req_cluster1', figure={}, style={'height': '12.5vw', 'width': '25vw'}),
