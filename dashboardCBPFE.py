@@ -7,7 +7,9 @@ import numpy as np
 import math
 from scipy.cluster.hierarchy import linkage, dendrogram, cut_tree, fcluster
 from scipy.spatial.distance import squareform, pdist
-from wordcloud import WordCloud, STOPWORDS
+#from wordcloud import WordCloud, STOPWORDS
+from dash_holoniq_wordcloud import DashWordcloud
+
 import json
 import base64
 import io
@@ -157,6 +159,15 @@ def fill(array):
         array.append({})
     return array
 
+def normalise(lst, vmax=100, vmin=10):
+    lmax = max(lst, key=lambda x: x[1])[1]
+    lmin = min(lst, key=lambda x: x[1])[1]
+    vrange = vmax-vmin
+    lrange = lmax-lmin or 1
+    for entry in lst:
+        entry[1] = int(((entry[1] - lmin) / lrange) * vrange + vmin)
+    return lst
+
 def plot_wordclouds(indices, dim, categorias, nivel):
     """
     Generates a wordcloud for each cluster
@@ -185,18 +196,11 @@ def plot_wordclouds(indices, dim, categorias, nivel):
                     conjuntos_palabras[df["Level {}".format(nivel)][r]] += categorias[str(i)]['keys'][j] + ' '
 
     for c in list(set(df["Level {}".format(nivel)])):  # se crea una nube de palabras por cada cluster
-        wordcloud = WordCloud(width=800, height=400,
-                              background_color='white',
-                              stopwords=STOPWORDS,
-                              min_font_size=8,
-                              collocations=False).generate(conjuntos_palabras[c])
-        # plot the WordCloud image   
-        fig = px.imshow(wordcloud)
-        fig.update_xaxes(showticklabels=False)
-        fig.update_yaxes(showticklabels=False)
-        fig.update_layout(coloraxis_showscale=False, margin=dict(l=0, r=0, b=0, t=0))
+        splitted_words = conjuntos_palabras[c].split(' ')
+        wordset = set(splitted_words)
+        wordlist_with_count = [[w, splitted_words.count(w)] for w in wordset]
 
-        array_wordclouds[int(c)-1] = fig
+        array_wordclouds[int(c) - 1] = normalise(wordlist_with_count)
 
     return array_wordclouds
 
@@ -457,18 +461,18 @@ def start(n_clicks, content):
      Output(component_id='cluster_seleccionado',    component_property='options'),
      #Graficos
      Output(component_id='dendrogram_graph',        component_property='figure'),
-     Output(component_id='wordcloud_req_cluster1',  component_property='figure'),
-     Output(component_id='wordcloud_req_cluster2',  component_property='figure'),
-     Output(component_id='wordcloud_req_cluster3',  component_property='figure'),
-     Output(component_id='wordcloud_req_cluster4',  component_property='figure'),
+     Output(component_id='wordcloud_req_cluster1',  component_property='list'),
+     Output(component_id='wordcloud_req_cluster2',  component_property='list'),
+     Output(component_id='wordcloud_req_cluster3',  component_property='list'),
+     Output(component_id='wordcloud_req_cluster4',  component_property='list'),
      Output(component_id='textarea_cluster1',       component_property='value'),
      Output(component_id='textarea_cluster2',       component_property='value'),
      Output(component_id='textarea_cluster3',       component_property='value'),
      Output(component_id='textarea_cluster4',       component_property='value'),
-     Output(component_id='wordcloud_stk_cluster1',  component_property='figure'),
-     Output(component_id='wordcloud_stk_cluster2',  component_property='figure'),
-     Output(component_id='wordcloud_stk_cluster3',  component_property='figure'),
-     Output(component_id='wordcloud_stk_cluster4',  component_property='figure'),
+     Output(component_id='wordcloud_stk_cluster1',  component_property='list'),
+     Output(component_id='wordcloud_stk_cluster2',  component_property='list'),
+     Output(component_id='wordcloud_stk_cluster3',  component_property='list'),
+     Output(component_id='wordcloud_stk_cluster4',  component_property='list'),
      Output(component_id='profit_cost_graph',       component_property='figure'),
      Output(component_id='box_plot_graph',          component_property='figure')],
 

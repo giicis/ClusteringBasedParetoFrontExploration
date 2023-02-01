@@ -3,6 +3,8 @@
 from dash import dcc
 from dash import html
 
+from dash_holoniq_wordcloud import DashWordcloud
+
 # Constantes
 MAXCLUST = 4  # máxima cantidad de clusters
 
@@ -112,17 +114,17 @@ main_layout = html.Div([
     ], style={'columnCount': 1}),
     html.Div([
         dcc.Textarea(id="textarea_cluster1", value="", rows=6, readOnly=True, style={'width' : "100%"}),
-        dcc.Graph(id='wordcloud_req_cluster1', figure={}, style={'height': '12.5vw', 'width': '25vw'}),
-        dcc.Graph(id='wordcloud_stk_cluster1', figure={}, style={'height': '12.5vw', 'width': '25vw'}),
-        dcc.Textarea(id="textarea_cluster2", value="", rows=6, readOnly=True, style={'width' : "100%"}),
-        dcc.Graph(id='wordcloud_req_cluster2', figure={}, style={'height': '12.5vw', 'width': '25vw'}),
-        dcc.Graph(id='wordcloud_stk_cluster2', figure={}, style={'height': '12.5vw', 'width': '25vw'}),
+        DashWordcloud(id='wordcloud_req_cluster1', list=[], height=800, width=800, hover=True, style={'height': '25vw', 'width': '25vw'}),
+        DashWordcloud(id='wordcloud_stk_cluster1', list=[], height=800, width=800, hover=True, style={'height': '25vw', 'width': '25vw'}),
+        dcc.Textarea(id="textarea_cluster2", value="", rows=6, readOnly=True, style={'width': "100%"}),
+        DashWordcloud(id='wordcloud_req_cluster2', list=[], height=800, width=800, hover=True, style={'height': '25vw', 'width': '25vw'}),
+        DashWordcloud(id='wordcloud_stk_cluster2', list=[], height=800, width=800, hover=True, style={'height': '25vw', 'width': '25vw'}),
         dcc.Textarea(id="textarea_cluster3", value="", rows=6, readOnly=True, style={'width' : "100%"}),
-        dcc.Graph(id='wordcloud_req_cluster3', figure={}, style={'height': '12.5vw', 'width': '25vw'}),
-        dcc.Graph(id='wordcloud_stk_cluster3', figure={}, style={'height': '12.5vw', 'width': '25vw'}),
+        DashWordcloud(id='wordcloud_req_cluster3', list=[], height=800, width=800, hover=True, style={'height': '25vw', 'width': '25vw'}),
+        DashWordcloud(id='wordcloud_stk_cluster3', list=[], height=800, width=800, hover=True, style={'height': '25vw', 'width': '25vw'}),
         dcc.Textarea(id="textarea_cluster4", value="", rows=6, readOnly=True, style={'width' : "100%"}),
-        dcc.Graph(id='wordcloud_req_cluster4', figure={}, style={'height': '12.5vw', 'width': '25vw'}),
-        dcc.Graph(id='wordcloud_stk_cluster4', figure={}, style={'height': '12.5vw', 'width': '25vw'})
+        DashWordcloud(id='wordcloud_req_cluster4', list=[], height=800, width=800, hover=True, style={'height': '25vw', 'width': '25vw'}),
+        DashWordcloud(id='wordcloud_stk_cluster4', list=[], height=800, width=800, hover=True, style={'height': '25vw', 'width': '25vw'})
         ], style={'columnCount': 4})
     ])
 
