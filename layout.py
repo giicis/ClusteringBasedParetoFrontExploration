@@ -125,7 +125,8 @@ main_layout = html.Div([
         dcc.Textarea(id="textarea_cluster4", value="", rows=6, readOnly=True, style={'width' : "100%"}),
         DashWordcloud(id='wordcloud_req_cluster4', list=[], height=800, width=800, hover=True, style={'height': '25vw', 'width': '25vw'}),
         DashWordcloud(id='wordcloud_stk_cluster4', list=[], height=800, width=800, hover=True, style={'height': '25vw', 'width': '25vw'})
-        ], style={'columnCount': 4})
+        ], style={'columnCount': 4}),
+
     ])
 
 layout = html.Div(id='page_content', children=start_layout, style={'font-family' : 'helvetica'})
