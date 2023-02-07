@@ -18,7 +18,7 @@ import ast
 import dash  # (version 1.12.0) pip install dash
 from dash.dependencies import Input, Output, State
 
-from datetime import datetime
+# from datetime import datetime
 
 # ------------------------------------------------------------------------------
 # The layout was placed on a separate file for organizational reasons.
@@ -290,8 +290,7 @@ def plot_all(nivel, n_deseado_de_clusters, array_filtros):
     deshabilitar_zoomin = (n_generado_de_clusters<=1)
     #You can't zoom in a cluster with less than 3 solutions
     options = [{'label': 'Cluster{}'.format(c), 'value': c, 'disabled': (estadisticos[c]['n_elementos'] <= 2)} for c in range(1, n_generado_de_clusters+1)]
-    
-    return (error, deshabilitar_zoomin, options, dn, wcreq[0], wcreq[1], wcreq[2], wcreq[3], stat[1], stat[2], stat[3], stat[4], wcstk[0], wcstk[1], wcstk[2], wcstk[3], pcg)
+    return (error, deshabilitar_zoomin, options, dn, wcreq[0], wcreq[1], wcreq[2], wcreq[3], stat[1], stat[2], stat[3], stat[4], wcstk[0], wcstk[1], wcstk[2], wcstk[3], pcg, data.loc[indices].to_dict('records'), [{"name": i, "id": i} for i in data.columns])
 
 def obtener_indices(nivel):
     """
@@ -386,6 +385,8 @@ def upload_data(list_contents, list_filenames):
     if (error_list == []):
         continue_disabled = False
 
+
+
         content_type, content_string = list_upload["pareto_front.json"].split(',')
         decoded = base64.b64decode(content_string)
         data = pd.read_json(io.BytesIO(decoded), orient='index', dtype={'reqs': str, 'stks': str})
@@ -471,7 +472,10 @@ def start(n_clicks, content):
      Output(component_id='wordcloud_stk_cluster2',  component_property='list'),
      Output(component_id='wordcloud_stk_cluster3',  component_property='list'),
      Output(component_id='wordcloud_stk_cluster4',  component_property='list'),
-     Output(component_id='profit_cost_graph',       component_property='figure')],
+     Output(component_id='profit_cost_graph',       component_property='figure'),
+    #Tabla
+     Output(component_id='data_table', component_property='data'),
+     Output(component_id='data_table', component_property='columns')],
 
     [ Input(component_id='btn-restore',             component_property='n_clicks'),
       Input(component_id='btn-zoomout',             component_property='n_clicks'),

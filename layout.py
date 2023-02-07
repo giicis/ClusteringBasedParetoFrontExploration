@@ -2,6 +2,7 @@
 #import dash_html_components as html
 from dash import dcc
 from dash import html
+from dash import dash_table
 
 from dash_holoniq_wordcloud import DashWordcloud
 
@@ -42,7 +43,6 @@ main_layout = html.Div([
         id='error_message',
         message="There are no solutions that fulfill all restrictions",
         ),
-
     html.H2("Clustering-based Pareto-Front exploration", style={'text-align': 'center'}),
     dcc.Slider(
         id="slider_nivel",
@@ -96,9 +96,10 @@ main_layout = html.Div([
 
     html.Div([
         dcc.Graph(id='profit_cost_graph', responsive=True, style={'height': '30vw'}),
-        dcc.Graph(id='dendrogram_graph', responsive=True, style={'height': '18vw'})
+        dcc.Graph(id='dendrogram_graph', responsive=True, style={'height': '18vw'}),
         ], style={'columnCount': 1}),
-
+    html.Div([html.H3("Data Table", style={'text-align': 'center'}),
+             dash_table.DataTable(data=[], columns=[], id='data_table', page_size=10, style_table={'overflowX': 'auto'})]),
     html.Hr(),
     html.H3("Cluster metadata", style={'text-align': 'center'}),
     html.P("Box plot graph", style={'text-align': 'left'}),
