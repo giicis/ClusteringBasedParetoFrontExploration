@@ -179,10 +179,13 @@ def plot_wordclouds(indices, dim, categorias, nivel):
     """
     global data
     df = data.loc[indices]
+    array_wordclouds = []
     conjuntos_palabras = {}
     for x in list(set(df["Level {}".format(nivel)])):
         conjuntos_palabras[str(x)] = "" #preparo una lista de strings vacios, uno por cada cluster
-    array_wordclouds = [{},{},{},{}]  # array para retornar los wordclouds generados
+    for i in range(MAXCLUST):
+        array_wordclouds.append({})
+    #array_wordclouds = [{},{},{},{}]  # array para retornar los wordclouds generados
 
     # para cada renglón del dataset
     for r in df["id"]:
@@ -256,6 +259,8 @@ def plot_all(nivel, n_deseado_de_clusters, array_filtros):
     :return: control variables, graphs to be displayed.
     """
     global data
+    global requirements
+    global stakeholders
 
     error=False
     try:
@@ -286,11 +291,36 @@ def plot_all(nivel, n_deseado_de_clusters, array_filtros):
     pcg = px.scatter(data.loc[indices], x="profit", y="cost", color=("Level {}".format(nivel)), hover_data=['id'])
     pcg.update_layout(coloraxis_showscale=False, margin=dict(l=0, r=0, b=0, t=0))
 
+    #DataTable
+    datatable = data.loc[indices].to_dict('records')
+    ##Replace datatable requirementes and stakeholders
+    for data_line in datatable:
+        req_list = []
+        stk_list = []
+        #Requirements
+        for req_index in range(len(data_line["reqs"])):
+            if data_line["reqs"][req_index] == "1":
+                req_list.append(requirements[str(req_index)]["id"])
+        #StakeHolders
+        for stk_index in range(len(data_line["stks"])):
+            if data_line["stks"][stk_index] == "1":
+                stk_list.append(stakeholders[str(stk_index)]["id"])
+        data_line["reqs"] = ", ".join(req_list)
+        data_line["stks"] = ", ".join(stk_list)
+    #DataColumns
+    datacolumns= []
+    for i in data.columns:
+        col_options = {"name": i, "id": i}
+        if i == "id":
+            col_options["type"] = "numeric"
+        datacolumns.append(col_options)
+    #EndDataTable
+
     #Disable zoomin if there are no clusters to choose
     deshabilitar_zoomin = (n_generado_de_clusters<=1)
     #You can't zoom in a cluster with less than 3 solutions
     options = [{'label': 'Cluster{}'.format(c), 'value': c, 'disabled': (estadisticos[c]['n_elementos'] <= 2)} for c in range(1, n_generado_de_clusters+1)]
-    return (error, deshabilitar_zoomin, options, dn, wcreq[0], wcreq[1], wcreq[2], wcreq[3], stat[1], stat[2], stat[3], stat[4], wcstk[0], wcstk[1], wcstk[2], wcstk[3], pcg, data.loc[indices].to_dict('records'), [{"name": i, "id": i} for i in data.columns])
+    return (error, deshabilitar_zoomin, options, dn, wcreq[0], wcreq[1], wcreq[2], wcreq[3], stat[1], stat[2], stat[3], stat[4], wcstk[0], wcstk[1], wcstk[2], wcstk[3], pcg, datatable, datacolumns)
 
 def obtener_indices(nivel):
     """
@@ -390,10 +420,10 @@ def upload_data(list_contents, list_filenames):
         content_type, content_string = list_upload["pareto_front.json"].split(',')
         decoded = base64.b64decode(content_string)
         data = pd.read_json(io.BytesIO(decoded), orient='index', dtype={'reqs': str, 'stks': str})
-        
+
         content_type, content_string = list_upload["requirements.json"].split(',')
         requirements = ast.literal_eval((base64.b64decode(content_string)).decode("UTF-8"))
-        
+
         content_type, content_string = list_upload["stakeholders.json"].split(',')
         stakeholders = ast.literal_eval((base64.b64decode(content_string)).decode("UTF-8"))
 
@@ -451,8 +481,8 @@ def start(n_clicks, content):
     [#Controles
      Output(component_id='cluster_seleccionado',    component_property='value'),
      Output(component_id='slider_nivel',            component_property='marks'),
-     Output(component_id='slider_nivel',            component_property='value'),  
-     Output(component_id='btn-restore',             component_property='disabled'),  
+     Output(component_id='slider_nivel',            component_property='value'),
+     Output(component_id='btn-restore',             component_property='disabled'),
      Output(component_id='btn-zoomout',             component_property='disabled'),
      Output(component_id='filtros-dropdown',        component_property='options'),
      Output(component_id='error_message',           component_property='displayed'),
@@ -577,12 +607,32 @@ def update_bxp(n_clicks_restore, n_clicks_out, n_clicks_in, y_input, num_cluster
     return fig  # returned objects are assigned to the component property of the Output
 
 
+
+@app.callback(
+    [Output(component_id='box_plot_graph', component_property='children')],
+    [Input(component_id='y-axis-boxplot', component_property='value')],
+    [State(component_id='cluster_seleccionado',    component_property='value'),
+    State(component_id='slider_nivel',            component_property='marks'),
+    State(component_id='slider_nivel',            component_property='value')]
+)
+def add_component(y_axis_bp, cst, marcas, nivel):
+    global data
+    global cluster_por_nivel
+    global array_filtros
+
+    for n in range(nivel + 1):
+        indices = np.logical_and(obtener_indices(n), array_filtros)
+        (linkage_matrix, n_generado_de_clusters) = algoritmo_clustering(indices, 4, nivel)
+    bxp = px.box(data.loc[indices], x="Level {}".format(nivel), y=y_axis_bp)
+    return (bxp)
+
+
 #______________________________________________________________________________
 
 #  Read Pareto front in JSON format.
 #  There is a little problem with reqs and stks attributes. They are read as integers and it may produce some errors.
-data = None 
-max_cost = None 
+data = None
+max_cost = None
 max_profit = None
 
 array_filtros = []
