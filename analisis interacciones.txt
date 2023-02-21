@@ -1,0 +1,28 @@
+Efectos sobre linkage
+
+- Cuando Zoom in
+    - Recuperar la cantidad de clusters deseados (n_clusters)
+    - Recuperar el número de cluster seleccionado (slctd_cluster)
+    - Buscar la raíz del nodo (slctd_root) (hierarchy.leaders)
+    - Filtrar todos los nodos que no tengan como ancestro a slctd_root (en data)
+    - Actualizar linkage matrix actual (recalcular índices y aglomeraciones) (reemplazar linkage)
+    - Hacer fcluster a la estructura de datos resultante
+    - Append de la columna con las etiquetas del fcluster
+
+- Cuando Zoom out
+    - Recuperar linkage matrix anterior (Memento)
+    - Hacer pop de la linkage matrix actual (Memento)
+    - Drop de la última columna de nivel
+    - Actualizar slider nclusters
+
+- Cuando restore
+    - Sobreescribir la estructura de datos actual con la original (Memento)
+    - Vaciar la pila de mementos
+
+- Cuando se añaden o eliminan filtros
+    - Recalcular linkage
+
+- Cuando se cambia el slider nclusters
+    - Drop de la ultima columna de nivel
+    - Hacer fcluster con el nuevo numero de clusters
+    - Append de la columna con las etiquetas del fcluster

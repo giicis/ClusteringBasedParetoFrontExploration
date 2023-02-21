@@ -1,6 +1,5 @@
 import collections
 import operator
-import random
 from functools import reduce
 
 import plotly.express as px  # (version 4.7.0)
@@ -11,7 +10,6 @@ import pandas as pd
 import numpy as np
 import math
 
-import skfuzzy.membership
 from scipy.cluster.hierarchy import linkage, dendrogram, cut_tree, fcluster
 from scipy.spatial.distance import squareform, pdist
 # from wordcloud import WordCloud, STOPWORDS
@@ -177,23 +175,13 @@ def fill(array):
     return array
 
 
-def normalise(lst, vmax=100, vmin=10):
-    lmax = max(lst, key=lambda x: x[1])[1]
-    lmin = min(lst, key=lambda x: x[1])[1]
-    vrange = vmax - vmin
-    lrange = lmax - lmin or 1
-    for entry in lst:
-        entry[1] = int(((entry[1] - lmin) / lrange) * vrange + vmin)
-    return lst
-
-
 def plot_treemaps(indices, dim, categorias, nivel):
     """
     Generates a treemap for each cluster
     :param indices: list of boolean that indicates which rows are going to be clustered.
     :param dim: data column to get info from (string)
-    :categorias: dict of categories to pair the data info
-    :nivel: level of clustering zoom.
+    :param categorias: dict of categories to pair the data info
+    :param nivel: level of clustering zoom.
     :return: array of treemaps
     """
     global data
@@ -350,6 +338,7 @@ def plot_all(nivel, n_deseado_de_clusters, array_filtros):
         return (error, True, [], {}, {}, {}, {}, {}, "", "", "", "", {}, {}, {}, {}, {})
 
     dn = ff.create_dendrogram(linkage_matrix)
+
     dn.update_xaxes(showticklabels=False)
     dn.update_yaxes(showticklabels=False)
     dn.update_layout(margin=dict(l=0, r=0, b=0, t=0))
@@ -635,9 +624,10 @@ def update_graphs(n_clicks_restore, n_clicks_out, n_clicks_in, num_clusters, key
 
     # get triggered event from callback_context
     ctx = dash.callback_context
-    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
     # Filtrado
     if ctx.triggered:
+        trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
         if trigger_id == 'btn-restore':
             cluster_por_nivel = []
             while (nivel > 0):
@@ -682,8 +672,8 @@ def update_bxp(n_clicks_restore, n_clicks_out, n_clicks_in, y_input, num_cluster
     global cluster_por_nivel
 
     ctx = dash.callback_context
-    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
     if ctx.triggered:
+        trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
         if trigger_id == 'btn-restore':
             while (nivel > 0):
                 nivel -= 1
@@ -719,7 +709,7 @@ def add_component(y_axis_bp, cst, marcas, nivel):
     global data
     global cluster_por_nivel
     global array_filtros
-
+    print("pasa por el add_component")
     for n in range(nivel + 1):
         indices = np.logical_and(obtener_indices(n), array_filtros)
         (linkage_matrix, n_generado_de_clusters) = algoritmo_clustering(indices, 4, nivel)
