@@ -59,3 +59,4 @@ if __name__ == '__main__':
     filtered_linkage_recalc_indexes = np.array([[converted_ids[int(row[0])], converted_ids[int(row[1])], row[2], row[3]] for i, row in filtered_linkage])
     print(filtered_linkage_recalc_indexes)
     plt.show()
+
