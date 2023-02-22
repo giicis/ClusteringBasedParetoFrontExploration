@@ -639,23 +639,88 @@ def update_bxp(n_clicks_restore, n_clicks_out, n_clicks_in, y_input, num_cluster
     return fig  # returned objects are assigned to the component property of the Output
 
 
+#RefactoringElements
 @app.callback(
-    [Output(component_id='box_plot_graph', component_property='children')],
-    [Input(component_id='y-axis-boxplot', component_property='value')],
-    [State(component_id='cluster_seleccionado', component_property='value'),
-     State(component_id='slider_nivel', component_property='marks'),
-     State(component_id='slider_nivel', component_property='value')]
+    [Output(component_id='store-data', component_property='data'),
+    Output(component_id='store-ind', component_property='data')],
+    [Input(component_id='btn-restore', component_property='n_clicks'),
+     Input(component_id='btn-zoomout', component_property='n_clicks'),
+     Input(component_id='btn-zoomin', component_property='n_clicks'),
+     Input(component_id='slider_num_clusters', component_property='value')],
+    State(component_id='slider_nivel', component_property='value')
 )
-def add_component(y_axis_bp, cst, marcas, nivel):
+def update_indices(n_clicks_restore, n_clicks_out, n_clicks_in, num_clusters, nivel):
     global data
-    global cluster_por_nivel
+    global palabras_clave
     global array_filtros
-    print("pasa por el add_component")
+    global cluster_por_nivel
+
+    ctx = dash.callback_context
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    if ctx.triggered:
+        if trigger_id == 'btn-restore':
+            while (nivel > 0):
+                nivel -= 1
+
+        if trigger_id == 'btn-zoomout':
+            nivel -= 1
+
+        if trigger_id == 'btn-zoomin':
+            nivel += 1
+
     for n in range(nivel + 1):
         indices = np.logical_and(obtener_indices(n), array_filtros)
-        (linkage_matrix, n_generado_de_clusters) = algoritmo_clustering(indices, 4, nivel)
-    bxp = px.box(data.loc[indices], x="Level {}".format(nivel), y=y_axis_bp)
-    return (bxp)
+        if not (any(indices)):
+            # An exception is raised if the resulting boolean array is all False
+            raise Exception("There are no solutions that fulfill all restrictions")
+        # (linkage_matrix, n_generado_de_clusters) = algoritmo_clustering(indices, num_clusters, n)
+        algoritmo_clustering(indices, num_clusters, n)
+    print("StoreData")
+    print(data)
+    print(type(data))
+    print("Transformando data a dict")
+    dataset = data.to_dict('records')
+    print(dataset[0])
+    print(type(dataset))
+    print(type(dataset[0]))
+    return dataset, indices
+
+@app.callback(
+    Output(component_id='box_plot_graph2',         component_property='figure'),
+    [Input(component_id='btn-restore',             component_property='n_clicks'),
+     Input(component_id='btn-zoomout',             component_property='n_clicks'),
+     Input(component_id='btn-zoomin',              component_property='n_clicks'),
+     Input(component_id='y-axis-boxplot2',          component_property='value'),
+     Input(component_id='slider_num_clusters',     component_property='value'),
+     Input(component_id='store-data',             component_property='data'),
+     Input(component_id='store-ind',             component_property='data')],
+     State(component_id='slider_nivel',            component_property='value')
+)
+def update_bxp2(n_clicks_restore, n_clicks_out, n_clicks_in, y_input, num_clusters, stored, indices, nivel):  # function arguments come from the component property of the Input
+    global data
+    global palabras_clave
+    global array_filtros
+    global cluster_por_nivel
+
+    ctx = dash.callback_context
+    trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+    if ctx.triggered:
+        if trigger_id == 'btn-restore':
+            while (nivel>0):
+                nivel -= 1
+
+        if trigger_id == 'btn-zoomout':
+            nivel -= 1
+
+        if trigger_id == 'btn-zoomin':
+            nivel += 1
+
+    print('Antes de transformar a DataFrame')
+    df = pd.DataFrame(stored)
+    print('Despues de transformar a DataFrame')
+    bxp2 = px.box(df.loc[indices], x="Level {}".format(nivel), y=y_input)
+    print('Antes de devolver el boxplot')
+    return bxp2  # Return figure
 
 
 # ______________________________________________________________________________

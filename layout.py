@@ -41,6 +41,8 @@ start_layout = html.Div([
 
 
 main_layout = html.Div([
+    dcc.Store(id='store-data', data=[], storage_type='memory'),
+    dcc.Store(id='store-ind', data=[], storage_type='memory'),
     dcc.ConfirmDialog(
         id='error_message',
         message="There are no solutions that fulfill all restrictions",
@@ -131,6 +133,20 @@ main_layout = html.Div([
         dcc.Graph(id='treemap_req_cluster4', figure={}, responsive=True, style={'height': '25vw', 'width': '25vw'}),
         dcc.Graph(id='treemap_stk_cluster4', figure={}, responsive=True, style={'height': '25vw', 'width': '25vw'}),
         ], style={'columnCount': 4}),
+    #Refactored Elements
+    html.Hr(),
+    html.H3("Refactored Elements", style={'text-align': 'center'}),
+    html.P("Refactored Box plot", style={'text-align': 'left'}),
+    html.Div([
+        html.P("y-axis:"),
+        dcc.RadioItems(
+            id='y-axis-boxplot2',
+            options=['profit', 'cost'],
+            value='profit',
+            inline=True
+        ),
+        dcc.Graph(id='box_plot_graph2', figure={})
+    ], style={'columnCount': 1}),
 
     ])
 
