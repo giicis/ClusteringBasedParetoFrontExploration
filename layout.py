@@ -41,8 +41,8 @@ start_layout = html.Div([
 
 
 main_layout = html.Div([
-    dcc.Store(id='store-data', data=[], storage_type='memory'),
-    dcc.Store(id='store-ind', data=[], storage_type='memory'),
+    #dcc.Store(id='store-data', data=[], storage_type='memory'),
+    #dcc.Store(id='store-ind', data=[], storage_type='memory'),
     dcc.ConfirmDialog(
         id='error_message',
         message="There are no solutions that fulfill all restrictions",
@@ -150,4 +150,8 @@ main_layout = html.Div([
 
     ])
 
-layout = html.Div(id='page_content', children=start_layout, style={'font-family' : 'helvetica'})
+layout = html.Div([
+    dcc.Store(id='store-data', data=[], storage_type='memory'),
+    dcc.Store(id='store-ind', data=[], storage_type='memory'),
+    html.Div(id='page_content', children=start_layout, style={'font-family' : 'helvetica'})
+ ])
