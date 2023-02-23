@@ -7,7 +7,7 @@ from scipy.cluster.hierarchy import fcluster, leaders, to_tree
 
 
 class ExplorerState:
-    def __init__(self, indexes: np.ndarray, linkage: np.ndarray, clusters: np.ndarray | None = None, filters: np.ndarray | None = None):
+    def __init__(self, indexes: np.ndarray, linkage: np.ndarray, clusters: np.ndarray | None = None, filters: np.ndarray | None = None, level: int = 0):
         if (len(indexes) - 1) != len(linkage):
             raise ValueError("While building Explorer State. Linkage is not adequate for these indexes."
                              "\nIndexes: {}\nLinkage: {}".format(indexes, linkage))
@@ -21,11 +21,13 @@ class ExplorerState:
         self._linkage = linkage
         self._clusters = clusters
         self._filters = filters
+        self._level = level
 
     def __copy__(self):
         return ExplorerState(self._indexes.copy(), self._linkage.copy(),
                              self._clusters.copy() if self._clusters is not None else None,
-                             self._filters.copy() if self._filters is not None else None)
+                             self._filters.copy() if self._filters is not None else None,
+                             self._level)
 
     @property
     def linkage(self):
@@ -46,6 +48,10 @@ class ExplorerState:
     @property
     def filters(self):
         return self._filters
+
+    @property
+    def level(self):
+        return self._level
 
 
 class ExplorerCommand(ABC):
@@ -85,7 +91,7 @@ class ClusterCommand(ExplorerCommandDefaultPersistence):
     def do(self, state: ExplorerState) -> ExplorerState:
         super().do(state)
         clusters = fcluster(state.linkage, self._nclusters, criterion='maxclust')
-        return ExplorerState(state.indexes, state.linkage, clusters)
+        return ExplorerState(state.indexes, state.linkage, clusters, level=state.level)
 
 
 class ZoomInCommand(ExplorerCommandDefaultPersistence):
@@ -123,7 +129,7 @@ class ZoomInCommand(ExplorerCommandDefaultPersistence):
         filtered_linkage_recalc_indexes = np.array(
             [[converted_ids[int(row[0])], converted_ids[int(row[1])], row[2], row[3]] for i, row in filtered_linkage])
 
-        return ExplorerState(filtered_indexes, filtered_linkage_recalc_indexes)
+        return ExplorerState(filtered_indexes, filtered_linkage_recalc_indexes, level=state.level+1)
 
 
 class ApplyFiltersCommand(ExplorerCommandDefaultPersistence):
@@ -135,12 +141,14 @@ class ApplyFiltersCommand(ExplorerCommandDefaultPersistence):
         super().do(state)
         if len(self._keys) != len(state.indexes):
             raise ValueError("ApplyFiltersCommand cannot be executed. Keys must be of same length as state's indexes.")
-        return ExplorerState(state.indexes, state.linkage, state.clusters, self._keys)
+        return ExplorerState(state.indexes, state.linkage, state.clusters, self._keys, state.level)
 
 
 class ParetoFrontExplorer:
-    def __init__(self, state):
-        self._state = state
+    def __init__(self, state, done_commands=[], undone_commands=[]):
+        self._actual_state = state
+        self._done_commands = done_commands
+        self._undone_commands = undone_commands
 
     def cluster(self, nclusters):
         pass

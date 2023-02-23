@@ -45,6 +45,7 @@ class TestCore(TestCase):
         # Assert
         self.assertIsNone(new_state.clusters)
         self.assertTrue(is_valid_linkage(new_state.linkage))
+        self.assertTrue(original_state.level == new_state.level-1)
 
     def test_zoomin_do_and_undo(self):
         # Arrange
