@@ -150,8 +150,18 @@ main_layout = html.Div([
 
     ])
 
+test_layout = html.Div([
+    html.Div([html.H3("Data Table", style={'text-align': 'center'}),
+             dash_table.DataTable(data=[], columns=[], id='data-table2', page_size=10,
+                                  style_table={'overflowX': 'auto'},
+                                  )])
+    ])
+
+
 layout = html.Div([
     dcc.Store(id='store-data', data=[], storage_type='memory'),
-    dcc.Store(id='store-ind', data=[], storage_type='memory'),
+    #dcc.Store(id='store-ind', data=[], storage_type='memory'),
+    #dcc.Store(id='store-req', data=[], storage_type='memory'),
+    #dcc.Store(id='store-stk', data=[], storage_type='memory'),
     html.Div(id='page_content', children=start_layout, style={'font-family' : 'helvetica'})
  ])
