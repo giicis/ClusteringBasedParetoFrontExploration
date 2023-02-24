@@ -24,6 +24,7 @@ import ast
 import dash  # (version 1.12.0) pip install dash
 from dash.dependencies import Input, Output, State
 
+import core
 # from datetime import datetime
 
 # ------------------------------------------------------------------------------
@@ -35,13 +36,13 @@ from util import distance
 modo_desarrollador = False  # True
 
 
-def generar_filtros(keys):
+def generar_filtros(data, keys):
     """
     Generates a boolean array that filter the solutions
     :param keys: list of strings that represent requerimients or stakeholders
     :return: boolean array
     """
-    global data
+    #global data
 
     filtro = [True] * len(data)
     # For each solution
@@ -302,7 +303,7 @@ def plot_all(nivel, n_deseado_de_clusters, array_filtros):
     pcg.update_layout(coloraxis_showscale=False, margin=dict(l=0, r=0, b=0, t=0))
 
     # DataTable
-    datatable = data.loc[indices].to_dict('records')
+    datatable = data.loc[indices].__dict__('records')
     ##Replace datatable requirementes and stakeholders
     for data_line in datatable:
         req_list = []
@@ -426,11 +427,7 @@ app.layout = layout
 
 @app.callback(
     [Output(component_id='btn-continue', component_property='disabled'),
-     Output(component_id='error_list', component_property='children'),
-     Output(component_id='store-data', component_property='data'),
-     #Output(component_id='store-req', component_property='data'),
-     #Output(component_id='store-stk', component_property='data')
-     ],
+     Output(component_id='error_list', component_property='children')],
     [Input(component_id='upload-data', component_property='contents')],
     [State(component_id='upload-data', component_property='filename')]
 )
@@ -440,19 +437,85 @@ def upload_data(list_contents, list_filenames):
     :content: .json file that contains the dataframe.
     :return: a boolean that disables the "Continue" button and a graph of the dataframe.
     """
-    global data
-    global requirements
-    global stakeholders
-    global palabras_clave
+    #global data
+    #global requirements
+    #global stakeholders
+    #global palabras_clave
 
-    continue_disabled = True
+    #continue_disabled = True
     list_upload = dict(zip(list_filenames, list_contents))
     error_list = validate_files(list_upload)
     print(error_list)
-    dataset = []
+    #dataset = []
+    continue_disabled = not (error_list == [])
+    #if (error_list == []):
+        #continue_disabled = False
 
-    if (error_list == []):
-        continue_disabled = False
+        #content_type, content_string = list_upload["pareto_front.json"].split(',')
+        #decoded = base64.b64decode(content_string)
+        #data = pd.read_json(io.BytesIO(decoded), orient='index', dtype={'reqs': str, 'stks': str})
+
+        #content_type, content_string = list_upload["requirements.json"].split(',')
+        #requirements = ast.literal_eval((base64.b64decode(content_string)).decode("UTF-8"))
+
+        #content_type, content_string = list_upload["stakeholders.json"].split(',')
+        #stakeholders = ast.literal_eval((base64.b64decode(content_string)).decode("UTF-8"))
+
+
+        #dataset = data.to_dict('records')
+
+        #print(dataset[0], requirements, stakeholders)
+
+        #print(type(dataset), type(requirements), type(stakeholders))
+
+        #palabras_clave = []
+        #for x in range(len(requirements)):
+        #    palabras_clave.append({
+        #        'label': requirements[str(x)]['id'],
+        #        'value': "reqs,{}".format(x)
+        #    })
+        #for x in range(len(stakeholders)):
+        #    palabras_clave.append({
+        #        'label': stakeholders[str(x)]['id'],
+        #        'value': "stks,{}".format(x)
+        #    })
+
+    reporte_errores = "".join(["\n* " + error for error in error_list])
+    #for error in error_list:
+    #    reporte_errores += "\n* " + error
+    return continue_disabled, reporte_errores
+
+
+
+@app.callback(
+    [Output(component_id='page_content', component_property='children'),
+     Output(component_id='store-data', component_property='data'),
+     Output(component_id='store-reqs', component_property='data'),
+     Output(component_id='store-stks', component_property='data'),
+     Output(component_id='store-keys', component_property='data'),
+     #Output(component_id='store-explorer', component_property='data')
+    ],
+    [Input(component_id='btn-continue', component_property='n_clicks')],
+    [State(component_id='upload-data', component_property='contents'),
+    State(component_id='upload-data', component_property='filename')]
+)
+def start(n_clicks, list_contents, list_filenames):
+    """
+    Callback function that updates the layout.
+    :n_clicks: not used
+    :content: .json file that contains the dataframe.
+    :return: the main layout.
+    """
+
+    layout = start_layout
+    dataset = []
+    requirements = []
+    stakeholders = []
+    palabras_clave = []
+
+    if n_clicks > 0:
+
+        list_upload = dict(zip(list_filenames, list_contents))
 
         content_type, content_string = list_upload["pareto_front.json"].split(',')
         decoded = base64.b64decode(content_string)
@@ -464,14 +527,6 @@ def upload_data(list_contents, list_filenames):
         content_type, content_string = list_upload["stakeholders.json"].split(',')
         stakeholders = ast.literal_eval((base64.b64decode(content_string)).decode("UTF-8"))
 
-
-        dataset = data.to_dict('records')
-
-        print(dataset[0], requirements, stakeholders)
-
-        print(type(dataset), type(requirements), type(stakeholders))
-
-        palabras_clave = []
         for x in range(len(requirements)):
             palabras_clave.append({
                 'label': requirements[str(x)]['id'],
@@ -483,124 +538,81 @@ def upload_data(list_contents, list_filenames):
                 'value': "stks,{}".format(x)
             })
 
-    reporte_errores = ""
-    for error in error_list:
-        reporte_errores += "\n* " + error
-    return continue_disabled, reporte_errores, dataset
-
-
-
-@app.callback(
-    [Output(component_id='page_content', component_property='children'),
-     #Output(component_id='store-data', component_property='data')
-    ],
-    [Input(component_id='btn-continue', component_property='n_clicks')]
-)
-def start(n_clicks):
-    """
-    Callback function that updates the layout.
-    :n_clicks: not used
-    :content: .json file that contains the dataframe.
-    :return: the main layout.
-    """
-
-    global data
-    global max_cost
-    global max_profit
-    #global start_layout
-    #global main_layout
-    global array_filtros
-
-    layout = start_layout
-
-    no_entra = True
-    if not (data is None):
-        no_entra = False
         max_cost = max(data["cost"])
         max_profit = max(data["profit"])
+        distance_matrix = squareform(pdist(data, lambda x, y: distance(x, y, max_profit, max_cost)))
+        linkage_matrix = linkage(distance_matrix, method="complete")
+        explorer = core.ParetoFrontExplorer(state=core.ExplorerState(indexes=data.index, linkage_matrix=linkage_matrix))
         dataset = data.to_dict('records')
-        print("Before saving")
-        #print(dataset[0])
-        layout = test_layout
-        array_filtros = [True] * len(data)
-    print(no_entra)
-    return layout
+        print("Antes de instanciar el test_layout")
+        layout = test_layout(explorer=explorer)
+        print("Luego de instanciar el test_layout")
+
+
+    return layout, dataset, requirements, stakeholders, palabras_clave
+
+@app.callback(
+    [Output(component_id='filtros-dropdown', component_property='options')],
+    Input(component_id='store-keys', component_property='data')
+)
+def populate_filtros_options(stored):
+
+    #print(stored)
+    return stored,
 
 @app.callback(
     [Output(component_id='data-table2', component_property='data'),
     Output(component_id='data-table2', component_property='columns')],
-    Input(component_id='store-data', component_property='data'),
+    [Input(component_id='store-data', component_property='data'),
+     Input(component_id='store-explorer', component_property='data')]
 )
 
-def test_table(stored):
-    print("Test_Table")
-    dataset = pd.DataFrame(stored)
-    #dataset = px.data.iris()
+def test_table(stored_data, explorer_as_dict):
+    #print("Test_Table")
+    dataset = pd.DataFrame(stored_data)
+    explorer = core.ParetoFrontExplorer()
+    #print("Explorer: {}".format(explorer_as_dict))
+    explorer.load(explorer_as_dict)
+    #print("Cargó el explorer")
+    #print("Estos son los índices que se cargaron:\n{}".format(explorer.actual_state.indexes))
+    dataset = dataset.loc[explorer.actual_state.indexes]
+
+    # si clusters está disponible en el estado agregarlo como última columna
+
+    if explorer.actual_state.clusters is not None:
+        print("Entró a agregar la columna de clusters en la tabla")
+        dataset["clusters"] = explorer.actual_state.clusters
+        print("Salió de agregar la columna de clusters en la tabla")
+
     datacolumns = []
     for i in dataset.columns:
         col_options = {"name": i, "id": i}
         if i == "id":
             col_options["type"] = "numeric"
         datacolumns.append(col_options)
-    print(datacolumns)
+    #print(datacolumns)
 
-
+    # Ojo que tal vez hay que hacer un no_update si el último comando no actualizó indexes
     return dataset.to_dict('records'), datacolumns
 
-
 @app.callback(
-    [  # Controles
-        Output(component_id='cluster_seleccionado', component_property='value'),
-        Output(component_id='slider_nivel', component_property='marks'),
-        Output(component_id='slider_nivel', component_property='value'),
-        Output(component_id='btn-restore', component_property='disabled'),
-        Output(component_id='btn-zoomout', component_property='disabled'),
-        Output(component_id='filtros-dropdown', component_property='options'),
-        Output(component_id='error_message', component_property='displayed'),
-        Output(component_id='btn-zoomin', component_property='disabled'),
-        Output(component_id='cluster_seleccionado', component_property='options'),
-        # Graficos
-        Output(component_id='dendrogram_graph', component_property='figure'),
-        Output(component_id='treemap_req_cluster1', component_property='figure'),
-        Output(component_id='treemap_req_cluster2', component_property='figure'),
-        Output(component_id='treemap_req_cluster3', component_property='figure'),
-        Output(component_id='treemap_req_cluster4', component_property='figure'),
-        Output(component_id='textarea_cluster1', component_property='value'),
-        Output(component_id='textarea_cluster2', component_property='value'),
-        Output(component_id='textarea_cluster3', component_property='value'),
-        Output(component_id='textarea_cluster4', component_property='value'),
-        Output(component_id='treemap_stk_cluster1', component_property='figure'),
-        Output(component_id='treemap_stk_cluster2', component_property='figure'),
-        Output(component_id='treemap_stk_cluster3', component_property='figure'),
-        Output(component_id='treemap_stk_cluster4', component_property='figure'),
-        Output(component_id='profit_cost_graph', component_property='figure')],
-
-    [Input(component_id='btn-restore', component_property='n_clicks'),
-     Input(component_id='btn-zoomout', component_property='n_clicks'),
-     Input(component_id='btn-zoomin', component_property='n_clicks'),
-     Input(component_id='slider_num_clusters', component_property='value'),
-     Input(component_id='filtros-dropdown', component_property='value')],
-    [State(component_id='cluster_seleccionado', component_property='value'),
-     State(component_id='slider_nivel', component_property='marks'),
-     State(component_id='slider_nivel', component_property='value')]
+    [Output(component_id='store-explorer', component_property='data')],
+    Input(component_id='filtros-dropdown', component_property='value'),
+    [State(component_id='store-explorer', component_property='data'),
+     State(component_id='store-data', component_property='data')]
 )
-def update_graphs(n_clicks_restore, n_clicks_out, n_clicks_in, num_clusters, keys, option_slctd, marcas_de_nivel,
-                  nivel):
-    """
-    Callback function used to update the graphs.
-    :n_clicks_out: number of clicks on the "zoom out" button.
-    :n_clicks_in: number of clicks on the "zoom in" button.
-    :num_clusters: maximum number of clusters to be generated.
-    :y_axis: y-axis of box plot.
-    :option_slctd: cluster selected to zoom in.
-    :marcas_de_nivel: marks in the clustering zoom level slider.
-    :param nivel: level of clustering zoom.
-    :return: control variables and graphs.
-    """
-    global data
-    global palabras_clave
-    global array_filtros
-    global cluster_por_nivel
+def update_explorer(keys, explorer_as_dict, stored_data):
+    dataset = pd.DataFrame(stored_data)
+    explorer = core.ParetoFrontExplorer()
+    # print("Explorer: {}".format(explorer_as_dict))
+    # print("Cargó el explorer")
+    # print("Estos son los índices que se cargaron:\n{}".format(explorer.actual_state.indexes))
+
+    print("Por levantar el explorer")
+    explorer.load(explorer_as_dict)
+    print(explorer_as_dict)
+    print(explorer.save())
+    print("Explorer loaded")
 
     # get triggered event from callback_context
     ctx = dash.callback_context
@@ -608,85 +620,24 @@ def update_graphs(n_clicks_restore, n_clicks_out, n_clicks_in, num_clusters, key
     # Filtrado
     if ctx.triggered:
         trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-        if trigger_id == 'btn-restore':
-            cluster_por_nivel = []
-            while (nivel > 0):
-                del data["Level {}".format(nivel)]
-                nivel -= 1
-
-        if trigger_id == 'btn-zoomout':
-            cluster_por_nivel.pop()
-            del data["Level {}".format(nivel)]
-            nivel -= 1
-
-        if trigger_id == 'btn-zoomin':
-            nivel += 1
-            marcas_de_nivel[nivel] = str(nivel)
-            cluster_por_nivel.append(str(option_slctd))
-
         if trigger_id == 'filtros-dropdown':
-            array_filtros = generar_filtros(keys)
-
-    deshab_restore = (nivel == 0)
-    deshab_zoomout = (nivel == 0)
-
-    # Plot
-    return (1, marcas_de_nivel, nivel, deshab_restore, deshab_zoomout, palabras_clave) + plot_all(nivel, num_clusters,
-                                                                                                  array_filtros)
-
-
-@app.callback(
-    Output(component_id='box_plot_graph', component_property='figure'),
-    [Input(component_id='btn-restore', component_property='n_clicks'),
-     Input(component_id='btn-zoomout', component_property='n_clicks'),
-     Input(component_id='btn-zoomin', component_property='n_clicks'),
-     Input(component_id='y-axis-boxplot', component_property='value'),
-     Input(component_id='slider_num_clusters', component_property='value')],
-    State(component_id='slider_nivel', component_property='value')
-)
-def update_bxp(n_clicks_restore, n_clicks_out, n_clicks_in, y_input, num_clusters,
-               nivel):  # function arguments come from the component property of the Input
-    global data
-    global palabras_clave
-    global array_filtros
-    global cluster_por_nivel
-
-    ctx = dash.callback_context
-    if ctx.triggered:
-        trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-        if trigger_id == 'btn-restore':
-            while (nivel > 0):
-                nivel -= 1
-
-        if trigger_id == 'btn-zoomout':
-            nivel -= 1
-
-        if trigger_id == 'btn-zoomin':
-            nivel += 1
-
-    for n in range(nivel + 1):
-        indices = np.logical_and(obtener_indices(n), array_filtros)
-        if not (any(indices)):
-            # An exception is raised if the resulting boolean array is all False
-            raise Exception("There are no solutions that fulfill all restrictions")
-        # (linkage_matrix, n_generado_de_clusters) = algoritmo_clustering(indices, num_clusters, n)
-        algoritmo_clustering(indices, num_clusters, n)
-
-    fig = px.box(data.loc[indices], x="Level {}".format(nivel), y=y_input)
-
-    return fig  # returned objects are assigned to the component property of the Output
-
-
-
-# ______________________________________________________________________________
-
-#  Read Pareto front in JSON format.
-#  There is a little problem with reqs and stks attributes. They are read as integers and it may produce some errors.
-data = None
-max_cost = None
-max_profit = None
-
-array_filtros = []
+            if keys is not None:
+                if explorer.actual_state.filters is not None:
+                    print("Undoing command")
+                    print(explorer.save())
+                    explorer.undo()
+                    print("Undone command")
+                    print(explorer.actual_state.__dict__())
+                dataset = dataset.loc[explorer.actual_state.indexes]
+                print("Por generar los filtros")
+                array_filtros = generar_filtros(dataset, keys)
+                print("Filtros generados")
+                explorer.apply_filter(array_filtros)
+                print("Explorer terminó de aplicar filtros")
+    #print(stored)
+    print("Explorer que devolvemos")
+    print(explorer.save())
+    return explorer.save(),
 
 if __name__ == '__main__':
     app.run_server(debug=True, dev_tools_ui=modo_desarrollador, dev_tools_props_check=modo_desarrollador)

@@ -302,7 +302,7 @@ def plot_all(nivel, n_deseado_de_clusters, array_filtros):
     pcg.update_layout(coloraxis_showscale=False, margin=dict(l=0, r=0, b=0, t=0))
 
     # DataTable
-    datatable = data.loc[indices].to_dict('records')
+    datatable = data.loc[indices].__dict__('records')
     ##Replace datatable requirementes and stakeholders
     for data_line in datatable:
         req_list = []
