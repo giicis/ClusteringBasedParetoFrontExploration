@@ -260,7 +260,6 @@ def plot_all(nivel, n_deseado_de_clusters, array_filtros):
     Runs the clustering algorithm and generates a dendogram, cluster statistics and treemaps, and a dispersion graph.
     :param nivel: level of clustering zoom.
     :n_deseado_de_clusters: maximum number of clusters to be generated.
-    :y_axis_bp: y-axis of box plot.
     :return: control variables, graphs to be displayed.
     """
     global data
@@ -594,6 +593,30 @@ def test_table(stored_data, explorer_as_dict):
 
     # Ojo que tal vez hay que hacer un no_update si el último comando no actualizó indexes
     return dataset.to_dict('records'), datacolumns
+
+@app.callback(
+    [Output(component_id='box_plot_graph', component_property='figure')],
+    [Input(component_id='store-data', component_property='data'),
+     Input(component_id='store-explorer', component_property='data'),
+     Input(component_id='y-axis-boxplot', component_property='value')]
+)
+
+def boxplot(stored_data, explorer_as_dict, y_input):
+    dataset = pd.DataFrame(stored_data)
+    explorer = core.ParetoFrontExplorer()
+    explorer.load(explorer_as_dict)
+    dataset = dataset.loc[explorer.actual_state.indexes]
+    print("Boxplots")
+    print(explorer.actual_state.clusters)
+    if explorer.actual_state.clusters is not None:
+        print("Entró a agregar la columna de clusters en la tabla")
+        dataset["clusters"] = explorer.actual_state.clusters
+        print("Salió de agregar la columna de clusters en la tabla")
+
+    print(dataset.columns)
+    bxp = px.box(dataset, x="clusters", y=y_input)
+    return bxp
+
 
 @app.callback(
     [Output(component_id='store-explorer', component_property='data')],
