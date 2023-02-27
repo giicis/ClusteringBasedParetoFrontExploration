@@ -1,29 +1,32 @@
-#import copy
+# import copy
 from abc import ABC, abstractmethod
 from builtins import RuntimeError
+from copy import copy
 from typing import Any
 
 import numpy as np
+from numpy import int32
 from scipy.cluster.hierarchy import fcluster, leaders, to_tree
 
 import core
 
 
 class ExplorerState:
-    def __init__(self, indexes: list = None, linkage_matrix: list = None, clusters: np.ndarray | None = None, filters: list | None = None, level: int = 0):
+    def __init__(self, indexes: list[int] = None, linkage_matrix: list = None, clusters: dict[int, int] | None = None,
+                 filters: dict[int, bool] | None = None, level: int = 0):
         if (len(indexes) - 1) != len(linkage_matrix):
             raise ValueError("While building Explorer State. Linkage is not adequate for these indexes."
                              "\nIndexes: {}\nLinkage: {}".format(indexes, linkage_matrix))
-        if clusters is not None and len(indexes) != len(clusters):
-            raise ValueError("While building Explorer State. Indexes and clusters must have the same length."
+        if clusters is not None and not all([idx in clusters.keys() for idx in indexes]):
+            raise ValueError("While building Explorer State. All indexes must be mapped by clusters dict."
                              "\nIndexes: {}\n Clusters: {}".format(indexes, clusters))
-        if filters is not None and len(indexes) != len(filters):
-            raise ValueError("While building Explorer State. Indexes and filters must have the same length."
-                             "\nIndexes: {}\nClusters: {}".format(indexes, filters))
+        if filters is not None and not all([idx in filters.keys() for idx in indexes]):
+            raise ValueError("While building Explorer State. All indexes must be mapped by filters dict."
+                             "\nIndexes: {}\nFilters: {}".format(indexes, filters))
         self._indexes = np.array(indexes)
         self._linkage_matrix = np.array(linkage_matrix)
-        self._clusters = None if clusters is None else np.array(clusters)
-        self._filters = None if filters is None else np.array(filters)
+        self._clusters = clusters
+        self._filters = filters
         self._level = level
 
     def __copy__(self):
@@ -36,8 +39,10 @@ class ExplorerState:
         return {
             "indexes": list(self._indexes),
             "linkage_matrix": [list(row) for row in self._linkage_matrix],
-            "clusters": list(self._clusters) if self._clusters is not None else None,
-            "filters": list(self._filters) if self._filters is not None else None,
+            "clusters": None if self._clusters is None
+            else {str(idx): c for idx, c in self._clusters.items()},
+            "filters": None if self._filters is None
+            else {str(idx): tv for idx, tv in self._filters.items()},
             "level": self._level
         }
 
@@ -51,7 +56,8 @@ class ExplorerState:
 
     @property
     def indexes(self):
-        return self._indexes if self._filters is None else self._indexes[self._filters]
+        return self._indexes if self._filters is None \
+            else self._indexes[[self._filters[idx] for idx in self._indexes]]
 
     @property
     def clusters(self):
@@ -64,6 +70,20 @@ class ExplorerState:
     @property
     def level(self):
         return self._level
+
+    @clusters.setter
+    def clusters(self, clusters_dict: dict[int, int]):
+        if clusters_dict is not None and not all([idx in clusters_dict.keys() for idx in self._indexes]):
+            raise ValueError("While building Explorer State. All indexes must be mapped by clusters dict."
+                             "\nIndexes: {}\n Clusters: {}".format(self._indexes, clusters_dict))
+        self._clusters = clusters_dict
+
+    @filters.setter
+    def filters(self, filters_dict: dict[int, bool]):
+        if filters_dict is not None and not all([idx in filters_dict.keys() for idx in self._indexes]):
+            raise ValueError("While building Explorer State. All indexes must be mapped by filters dict."
+                             "\nIndexes: {}\nFilters: {}".format(self._indexes, filters_dict))
+        self._filters = filters_dict
 
 
 class ExplorerCommand(ABC):
@@ -86,7 +106,7 @@ class ExplorerCommandDefaultPersistence(ExplorerCommand):
 
     @abstractmethod
     def do(self, state: ExplorerState) -> ExplorerState:
-        #self._state = copy.copy(state)
+        # self._state = copy.copy(state)
         self._state = state
         return self._state
 
@@ -107,12 +127,19 @@ class ClusterCommand(ExplorerCommandDefaultPersistence):
     def do(self, state: ExplorerState) -> ExplorerState:
         super().do(state)
         clusters = fcluster(state.linkage_matrix, self._nclusters, criterion='maxclust')
-        return ExplorerState(state.indexes, state.linkage_matrix, clusters, level=state.level)
+        new_state = state.__copy__()
+        filters = new_state.filters
+        new_state.filters = None
+        new_state.clusters = {new_state.indexes[i]: cluster_number for i, cluster_number in enumerate(clusters)}
+        new_state.filters = filters
+        #print("Clusters generated")
+        #print(new_state.clusters)
+        return new_state
 
     def __dict__(self):
         return {
-            'classname' : self.__class__.__name__,
-            'kwargs' : {
+            'classname': self.__class__.__name__,
+            'kwargs': {
                 "state": None if self._state is None else self._state.__dict__(),
                 "nclusters": self._nclusters
             }
@@ -122,7 +149,9 @@ class ClusterCommand(ExplorerCommandDefaultPersistence):
 class ZoomInCommand(ExplorerCommandDefaultPersistence):
     def __init__(self, selected_cluster: int, state=None):
         if selected_cluster <= 0:
-            raise ValueError("While building ZoomInCommand. selected_cluster must be a positive integer ({} received)".format(selected_cluster))
+            raise ValueError(
+                "While building ZoomInCommand. selected_cluster must be a positive integer ({} received)".format(
+                    selected_cluster))
         super().__init__(state)
         self._selected_cluster = selected_cluster
 
@@ -134,19 +163,30 @@ class ZoomInCommand(ExplorerCommandDefaultPersistence):
     def do(self, state: ExplorerState) -> ExplorerState:
         super().do(state)
         clusters = state.clusters
+        # Must clear filters to properly make the zoom in
+        new_state = state.__copy__()
+        filters = new_state.filters
+        new_state.filters = None
+
+        # intermediate_state = copy(state)
+        # intermediate_state.filters = None
         if clusters is None:
             raise ValueError("Zoom in command cannot be executed in an unclustered state.")
-        if self._selected_cluster > (NCLUSTERS := max(state.clusters)):
-            raise ValueError("Zoom in command cannot be executed. Selected cluster is out of bounds. Number of clusters is {} and I want to select {}.".format(NCLUSTERS, self._selected_cluster))
-        L, M = leaders(state.linkage_matrix, clusters)
+        if self._selected_cluster > (NCLUSTERS := max(state.clusters.values())):
+            raise ValueError(
+                "Zoom in command cannot be executed. Selected cluster is out of bounds. Number of clusters is {} and I want to select {}.".format(
+                    NCLUSTERS, self._selected_cluster))
+        clusters_array = np.array([int32(clusters[idx]) for idx in new_state.indexes]) # no me pregunten por qué pero no anda esto
+        #clusters_array2 = fcluster(state.linkage_matrix, NCLUSTERS, criterion='maxclust')
+        L, M = leaders(new_state.linkage_matrix, clusters_array)
         selected_root = L[np.where(M == self._selected_cluster)][0]
-        tree = to_tree(state.linkage_matrix, rd=True)
+        tree = to_tree(new_state.linkage_matrix, rd=True)
         selected_tree = tree[1][selected_root]
 
-        filtered_linkage = self.filter_linkage(state.linkage_matrix, selected_tree)
+        filtered_linkage = self.filter_linkage(new_state.linkage_matrix, selected_tree)
 
         leafs = selected_tree.pre_order(lambda x: x.id)
-        filtered_indexes = np.array([state.indexes[x] for x in leafs])
+        filtered_indexes = [new_state.indexes[x] for x in leafs]
 
         converted_ids = {leaf: i for i, leaf in enumerate(leafs)}
         converted_ids = converted_ids | {row[0]: (len(leafs) + i) for i, row in enumerate(filtered_linkage)}
@@ -154,7 +194,7 @@ class ZoomInCommand(ExplorerCommandDefaultPersistence):
         filtered_linkage_recalc_indexes = np.array(
             [[converted_ids[int(row[0])], converted_ids[int(row[1])], row[2], row[3]] for i, row in filtered_linkage])
 
-        return ExplorerState(filtered_indexes, filtered_linkage_recalc_indexes, level=state.level+1)
+        return ExplorerState(filtered_indexes, filtered_linkage_recalc_indexes, filters=filters, level=new_state.level + 1)
 
     def __dict__(self):
         return {
@@ -167,22 +207,24 @@ class ZoomInCommand(ExplorerCommandDefaultPersistence):
 
 
 class ApplyFiltersCommand(ExplorerCommandDefaultPersistence):
-    def __init__(self, keys: list, state=None):
+    def __init__(self, keys: dict[int, bool], state=None):
         super().__init__(state)
-        self._keys = np.array(keys)
+        self._keys = keys
 
     def do(self, state: ExplorerState) -> ExplorerState:
         super().do(state)
-        if len(self._keys) != len(state.indexes):
-            raise ValueError("ApplyFiltersCommand cannot be executed. Keys must be of same length as state's indexes.")
-        return ExplorerState(state.indexes, state.linkage_matrix, state.clusters, self._keys, state.level)
+        # if len(self._keys) != len(state.indexes):
+        #    raise ValueError("ApplyFiltersCommand cannot be executed. Keys must be of same length as state's indexes.")
+        new_state = state.__copy__()
+        new_state.filters = self._keys
+        return new_state
 
     def __dict__(self):
         return {
             'classname': self.__class__.__name__,
             'kwargs': {
                 "state": None if self._state is None else self._state.__dict__(),
-                "keys": list(self._keys)
+                "keys": {str(idx): tv for idx, tv in self._keys.items()}
             }
         }
 
@@ -194,7 +236,7 @@ class CompositeCommand(ExplorerCommandDefaultPersistence):
         self._command_list = command_list
 
     def do(self, state: ExplorerState) -> ExplorerState:
-        #self._state = copy.copy(state)
+        # self._state = copy.copy(state)
         actual_state = super().do(state)
         for command in self._command_list:
             actual_state = command.do(actual_state)
@@ -220,23 +262,45 @@ class ParetoFrontExplorer:
     def actual_state(self) -> ExplorerState:
         return self._actual_state
 
+    def _build_state(self, state_as_dict):
+        if "filters" in state_as_dict and state_as_dict["filters"] is not None:
+            state_as_dict["filters"] = {int(idx): tf for idx, tf in state_as_dict["filters"].items()}
+        if "clusters" in state_as_dict and state_as_dict["clusters"] is not None:
+            state_as_dict["clusters"] = {int(idx): c for idx, c in state_as_dict["clusters"].items()}
+        state = ExplorerState(**state_as_dict)
+        return state
+
+    def _build_command(self, command_as_dict):
+        command_as_dict["kwargs"]["state"] = None if command_as_dict["kwargs"]["state"] is None \
+                else self._build_state(command_as_dict["kwargs"]["state"])
+        if "keys" in command_as_dict["kwargs"] and command_as_dict["kwargs"]["keys"] is not None:
+            command_as_dict["kwargs"]["keys"] = {int(idx): tv for idx, tv in command_as_dict["kwargs"]["keys"].items()}
+        command = eval("core." + command_as_dict["classname"])(**command_as_dict["kwargs"])
+        return command
+
     def load(self, store):
         if store is None:
             raise ValueError("While loading ParetoFrontExplorer. Store argument must be not None.")
         if not ("state" in store and "done_commands" in store and "undone_commands" in store):
-            raise ValueError("While loading ParetoFrontExplorer. Store argument is inadequate because some key is lacking. \nstore received: {}".format(store))
-        self._actual_state = ExplorerState(**store["state"])
+            raise ValueError(
+                "While loading ParetoFrontExplorer. Store argument is inadequate because some key is lacking. \nstore received: {}".format(
+                    store))
+        self._actual_state = self._build_state(store["state"])
+
         self._done_commands = []
-        for command_as_dict in store["done_commands"]:
-            command_as_dict["kwargs"]["state"] = None if command_as_dict["kwargs"]["state"] is None \
-                else ExplorerState(**command_as_dict["kwargs"]["state"])
-            command = eval("core."+command_as_dict["classname"])(**command_as_dict["kwargs"])
-            self._done_commands.append(command)
-        for command_as_dict in store["undone_commands"]:
-            command_as_dict["kwargs"]["state"] = None if command_as_dict["kwargs"]["state"] is None \
-                else ExplorerState(**command_as_dict["kwargs"]["state"])
-            command = eval("core." + command_as_dict["classname"])(**command_as_dict["kwargs"])
-            self._undone_commands.append(command)
+        self._done_commands = [self._build_command(command_as_dict) for command_as_dict in store["done_commands"]]
+        #for command_as_dict in store["done_commands"]:
+        #    command_as_dict["kwargs"]["state"] = None if command_as_dict["kwargs"]["state"] is None \
+        #        else ExplorerState(**command_as_dict["kwargs"]["state"])
+        #    command = eval("core." + command_as_dict["classname"])(**command_as_dict["kwargs"])
+        #    self._done_commands.append(command)
+
+        self._undone_commands = [self._build_command(command_as_dict) for command_as_dict in store["undone_commands"]]
+        #for command_as_dict in store["undone_commands"]:
+        #    command_as_dict["kwargs"]["state"] = None if command_as_dict["kwargs"]["state"] is None \
+        #        else ExplorerState(**command_as_dict["kwargs"]["state"])
+        #    command = eval("core." + command_as_dict["classname"])(**command_as_dict["kwargs"])
+        #    self._undone_commands.append(command)
 
     def save(self):
         return {
@@ -246,10 +310,26 @@ class ParetoFrontExplorer:
         }
 
     def cluster(self, nclusters):
-        pass
+        self._undone_commands.clear()
+
+        try:
+            cluster_command = core.ClusterCommand(nclusters)
+            self._actual_state = cluster_command.do(self._actual_state)
+            self._done_commands.append(cluster_command)
+
+        except:
+            print("Algo pasó con el comando cluster")
 
     def zoom_in(self, selected_cluster):
-        pass
+        self._undone_commands.clear()
+
+        try:
+            zoomin_command = core.ZoomInCommand(selected_cluster)
+            self._actual_state = zoomin_command.do(self._actual_state)
+            self._done_commands.append(zoomin_command)
+
+        except:
+            print("Algo pasó con el comando zoom in")
 
     def undo(self):
         if len(self._done_commands) == 0:
@@ -270,6 +350,9 @@ class ParetoFrontExplorer:
     def apply_filter(self, filters):
         # Warning: stacked filter commands not allowed
         self._undone_commands.clear()
-        filter_command = core.ApplyFiltersCommand(filters)
-        self._actual_state = filter_command.do(self._actual_state)
-        self._done_commands.append(filter_command)
+        try:
+            filter_command = core.ApplyFiltersCommand(filters)
+            self._actual_state = filter_command.do(self._actual_state)
+            self._done_commands.append(filter_command)
+        except:
+            print("Algo pasó con el comando filter")

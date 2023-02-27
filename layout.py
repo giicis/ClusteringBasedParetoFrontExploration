@@ -6,7 +6,7 @@ from dash import dcc
 from dash import html
 from dash import dash_table
 
-from dash_holoniq_wordcloud import DashWordcloud
+#from dash_holoniq_wordcloud import DashWordcloud
 
 # Constantes
 MAXCLUST = 4  # máxima cantidad de clusters
@@ -40,9 +40,10 @@ start_layout = html.Div([
 ])
 
 
-main_layout = html.Div([
+main_layout = lambda explorer: html.Div([
     #dcc.Store(id='store-data', data=[], storage_type='memory'),
     #dcc.Store(id='store-ind', data=[], storage_type='memory'),
+    dcc.Store(id='store-explorer', data=explorer),
     dcc.ConfirmDialog(
         id='error_message',
         message="There are no solutions that fulfill all restrictions",
@@ -54,7 +55,7 @@ main_layout = html.Div([
         max=10,
         value=0,
         step=1,
-        marks={0: '0'}, # Ponerlo como default, luego se irá sobreescribiendo, no hace falta la variable global.
+        marks={0: '0'},
         included=False,
         disabled=True
     ),
@@ -103,7 +104,7 @@ main_layout = html.Div([
         dcc.Graph(id='dendrogram_graph', responsive=True, style={'height': '18vw'}),
         ], style={'columnCount': 1}),
     html.Div([html.H3("Data Table", style={'text-align': 'center'}),
-             dash_table.DataTable(data=[], columns=[], id='data_table', page_size=10,
+             dash_table.DataTable(data=[], columns=[], id='data-table2', page_size=10,
                                   style_table={'overflowX': 'auto'},
                                   )]),
     html.Hr(),
@@ -119,40 +120,41 @@ main_layout = html.Div([
         ),
         dcc.Graph(id='box_plot_graph', figure={})
     ], style={'columnCount': 1}),
-    html.Div([
-        dcc.Textarea(id="textarea_cluster1", value="", rows=6, readOnly=True, style={'width' : "100%"}),
-        dcc.Graph(id='treemap_req_cluster1', figure={}, responsive=True, style={'height': '25vw', 'width': '25vw'}),
-        dcc.Graph(id='treemap_stk_cluster1', figure={}, responsive=True, style={'height': '25vw', 'width': '25vw'}),
-        dcc.Textarea(id="textarea_cluster2", value="", rows=6, readOnly=True, style={'width': "100%"}),
-        dcc.Graph(id='treemap_req_cluster2', figure={}, responsive=True, style={'height': '25vw', 'width': '25vw'}),
-        dcc.Graph(id='treemap_stk_cluster2', figure={}, responsive=True, style={'height': '25vw', 'width': '25vw'}),
-        dcc.Textarea(id="textarea_cluster3", value="", rows=6, readOnly=True, style={'width' : "100%"}),
-        dcc.Graph(id='treemap_req_cluster3', figure={}, responsive=True, style={'height': '25vw', 'width': '25vw'}),
-        dcc.Graph(id='treemap_stk_cluster3', figure={}, responsive=True, style={'height': '25vw', 'width': '25vw'}),
-        dcc.Textarea(id="textarea_cluster4", value="", rows=6, readOnly=True, style={'width' : "100%"}),
-        dcc.Graph(id='treemap_req_cluster4', figure={}, responsive=True, style={'height': '25vw', 'width': '25vw'}),
-        dcc.Graph(id='treemap_stk_cluster4', figure={}, responsive=True, style={'height': '25vw', 'width': '25vw'}),
-        ], style={'columnCount': 4}),
-    #Refactored Elements
     html.Hr(),
-    html.H3("Refactored Elements", style={'text-align': 'center'}),
-    html.P("Refactored Box plot", style={'text-align': 'left'}),
+    html.Div([html.H3("Statistics", style={'text-align': 'center'}),
+             dash_table.DataTable(data=[], columns=[], id='data-table-statistics', page_size=10,
+                                  style_table={'overflowX': 'auto'},
+                                  )], style={'columnCount': 1}),
+    html.Hr(),
     html.Div([
-        html.P("y-axis:"),
-        dcc.RadioItems(
-            id='y-axis-boxplot2',
-            options=['profit', 'cost'],
-            value='profit',
-            inline=True
-        ),
-        dcc.Graph(id='box_plot_graph2', figure={})
-    ], style={'columnCount': 1}),
-
+        dcc.Graph(id='treemaps-graph', responsive=True, style={'height': '75vw'}),
+        ], style={'columnCount': 1}),
     ])
 
 test_layout = lambda explorer: html.Div([
-    html.Div([html.H3("Data Table", style={'text-align': 'center'}),
-              dcc.Store(id='store-explorer', data=explorer.save()),
+    html.Div([html.H3("Dashboard", style={'text-align': 'center'}),
+              dcc.Store(id='store-explorer', data=explorer),
+              html.Button('Zoom in', id='btn-zoomin', style={'font-family' : 'helvetica', 'width': "33%", 'height': "20%"}, disabled=False),
+              dcc.RadioItems(
+                id="cluster_seleccionado",
+                value=1,
+                # list comprehension to save time avoiding loops
+                options=[{'label': 'Cluster{}'.format(c), 'value': c} for c in range(1, MAXCLUST + 1)],
+                labelStyle={'display': 'inline-block'},
+                inline=True
+                ),
+            html.Br(),
+            html.Div(children='Desired number of clusters', style={'text-align': 'left'}),
+            dcc.Slider(
+                id="slider_num_clusters",
+                min=2,
+                max=MAXCLUST,
+                value=MAXCLUST,
+                step=1,
+                # dict from list comprehension to save time avoiding loops
+                marks=dict(zip(range(2, MAXCLUST+1), [str(x) for x in range(2, MAXCLUST+1)])),
+                included=False,
+                ),
               dash_table.DataTable(data=[], columns=[], id='data-table2', page_size=10,
                                    style_table={'overflowX': 'auto'},
                                    ),

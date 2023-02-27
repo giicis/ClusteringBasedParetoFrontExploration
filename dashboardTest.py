@@ -10,11 +10,9 @@ import pandas as pd
 import numpy as np
 import math
 
+from plotly.subplots import make_subplots
 from scipy.cluster.hierarchy import linkage, dendrogram, cut_tree, fcluster
 from scipy.spatial.distance import squareform, pdist
-# from wordcloud import WordCloud, STOPWORDS
-# from dash_holoniq_wordcloud import DashWordcloud
-
 
 import json
 import base64
@@ -25,7 +23,6 @@ import dash  # (version 1.12.0) pip install dash
 from dash.dependencies import Input, Output, State
 
 import core
-# from datetime import datetime
 
 # ------------------------------------------------------------------------------
 # The layout was placed on a separate file for organizational reasons.
@@ -44,9 +41,9 @@ def generar_filtros(data, keys):
     """
     #global data
 
-    filtro = [True] * len(data)
+    filtro = {r: True for r in data.index}
     # For each solution
-    for r in range(len(data)):
+    for r in data.index:
         # For each key
         for key in keys:
             # A key is composed by a category and an index. For example: "reqs,4" refers to index 4 in the 'reqs' array of a solution.
@@ -58,19 +55,6 @@ def generar_filtros(data, keys):
 
 
 distance_matrix = None
-
-
-def get_distance_matrix():
-    """
-    Distance matrix calculated from the data
-    :return: distance matrix
-    """
-    global distance_matrix
-    if distance_matrix is None:
-        # Calculate the distance between each pair of quasi-optimal solutions.
-        distance_matrix = squareform(pdist(data.values, lambda x, y: distance(x, y, max_profit, max_cost)))
-        print('se generó la distance_matrix')
-    return distance_matrix
 
 
 # Statistics--------------------------------------------------------------------------
@@ -118,7 +102,7 @@ def fill(array):
     return array
 
 
-def plot_treemaps(indices, dim, categorias, nivel):
+def plot_treemaps(dataset, dim, categorias, nivel):
     """
     Generates a treemap for each cluster
     :param indices: list of boolean that indicates which rows are going to be clustered.
@@ -127,15 +111,12 @@ def plot_treemaps(indices, dim, categorias, nivel):
     :param nivel: level of clustering zoom.
     :return: array of treemaps
     """
-    global data
-    df = data.loc[indices]
-    array_treemaps = []
+    dict_treemaps = {}
     conjuntos_palabras = {}
-    for x in list(set(df["Level {}".format(nivel)])):
+    cluster_set = set(dataset["clusters"])
+    for x in cluster_set:
         conjuntos_palabras[str(x)] = {}  # preparo una lista de diccionarios vacios, uno por cada cluster
-    for i in range(MAXCLUST):
-        array_treemaps.append({})
-    # array_treemaps = [{},{},{},{}]  # array para retornar los treemaps generados
+        dict_treemaps[str(x)] = {}
 
     # esto habría que hacerlo 1 sola vez al principio cuando se carga el dataset
     # TODO: moverlo al lugar que corresponde
@@ -146,7 +127,7 @@ def plot_treemaps(indices, dim, categorias, nivel):
     # calculamos las frecuencias de cada categoría en cada solución
     keys_counts_per_solution = {
         r: reduce(operator.add, [collections.Counter(categorias[str(i)]['keys']) for i in range(len(categorias))
-                                 if df[dim][r][i] == '1'], collections.Counter()) for r in df["id"]}
+                                 if dataset[dim][r][i] == '1'], collections.Counter()) for r in dataset["id"]}
 
     # calculamos cuán "cubierta" está cada palabra por las distintas soluciones:
     #print("Antes de la normalizacion")
@@ -166,12 +147,11 @@ def plot_treemaps(indices, dim, categorias, nivel):
     quantified_keys_membership_per_solution = {(q, r):collections.Counter(build_mf(counter, mf_fuzzy_quantifiers[q])) for r, counter in keys_counts_per_solution.items() for q in fuzzy_quantifiers}
     level = "Level {}".format(nivel)  # lo asignamos antes por tema performance
     print("Terminó el cálculo de las funciones de pertenencia")
-    clusters = list(set(df[level]))
-    clusters.sort()
-    for c in clusters:  # se crea un treemap por cada cluster
+
+    for c in cluster_set:  # se crea un treemap por cada cluster
         print("Comenzamos con el cluster {}".format(c))
 
-        df2 = df[df[level] == c] # obtenemos sólo las filas del cluster
+        df2 = dataset[dataset["clusters"] == c] # obtenemos sólo las filas del cluster
         print("Calculando cantidad de filas")
         cluster_size = len(df2)
         print("Calculando cardinales")
@@ -189,7 +169,7 @@ def plot_treemaps(indices, dim, categorias, nivel):
         values = [count for _, count in quantified_keys_by_cluster.items() if count] #fuzzy cardinal
         colors = [fuzziness_keys_by_cluster[(q, key)] for (q, key), count in quantified_keys_by_cluster.items() if count] # index of fuzziness
 
-        fig = go.Figure(go.Treemap(
+        treemap = go.Treemap(
             ids=ids,
             labels=labels,
             parents=parents,
@@ -204,55 +184,11 @@ def plot_treemaps(indices, dim, categorias, nivel):
                 cmax=1.
             ),
             hovertemplate='<b>%{label} </b> <br> Support: %{value}<br> Fuzziness: %{color:.2f}',
-        ))
+        )
 
-        fig.update_layout(margin=dict(t=15, l=5, r=5, b=15))
-        array_treemaps[int(c) - 1] = fig
+        dict_treemaps[str(c)] = treemap
         print("Terminamos con el cluster {}".format(c))
-    return array_treemaps
-
-
-def algoritmo_clustering(indices, n_deseado_de_clusters, nivel):
-    """
-    Hierarchical clustering on the dataframe rows indicated by indeces parameter.
-    :param indices: list of boolean that indicates which rows are going to be clustered.
-    :n_deseado_de_clusters: maximum number of clusters to be generated.
-    :param nivel: level of clustering zoom.
-    :return: linkage matrix, number of generated clusters.
-    """
-    global data
-
-    # time_1 = datetime.now()
-
-    # filter rows and columns according to indices
-    dist_matrix_filtrada = pd.DataFrame.to_numpy((pd.DataFrame(get_distance_matrix())).loc[indices, indices])
-
-    # time_2 = datetime.now()
-    # time_diff = time_2 - time_1
-    # print(time_diff)
-
-    # get linkage matrix for hierarchical clustering
-    linkage_matrix = linkage(dist_matrix_filtrada, method="complete")
-
-    # time_3 = datetime.now()
-    # time_diff = time_3 - time_2
-    # print(time_diff)
-
-    # get clusters
-    clusters = fcluster(linkage_matrix, n_deseado_de_clusters, criterion='maxclust')
-
-    # time_4 = datetime.now()
-    # time_diff = time_4 - time_3
-    # print(time_diff)
-
-    n_generado_de_clusters = len(set(clusters))
-
-    # if index = True, next(clusters) else None
-    clusters = iter(clusters)
-    data["Level {}".format(nivel)] = [str(next(clusters)) if valor else None for valor in
-                                      indices]  # esta guardando los clusters como float
-
-    return linkage_matrix, n_generado_de_clusters
+    return dict_treemaps
 
 
 def plot_all(nivel, n_deseado_de_clusters, array_filtros):
@@ -275,12 +211,12 @@ def plot_all(nivel, n_deseado_de_clusters, array_filtros):
             if not (any(indices)):
                 # An exception is raised if the resulting boolean array is all False
                 raise Exception("There are no solutions that fulfill all restrictions")
-            (linkage_matrix, n_generado_de_clusters) = algoritmo_clustering(indices, n_deseado_de_clusters, n)
+            #(linkage_matrix, n_generado_de_clusters) = algoritmo_clustering(indices, n_deseado_de_clusters, n)
     except:
         error = True
         return (error, True, [], {}, {}, {}, {}, {}, "", "", "", "", {}, {}, {}, {}, {})
 
-    dn = ff.create_dendrogram(linkage_matrix)
+    #dn = ff.create_dendrogram(linkage_matrix)
 
     dn.update_xaxes(showticklabels=False)
     dn.update_yaxes(showticklabels=False)
@@ -545,7 +481,8 @@ def start(n_clicks, list_contents, list_filenames):
         explorer = core.ParetoFrontExplorer(state=core.ExplorerState(indexes=data.index, linkage_matrix=linkage_matrix))
         dataset = data.to_dict('records')
         print("Antes de instanciar el test_layout")
-        layout = test_layout(explorer=explorer)
+        explorer.cluster(4)
+        layout = main_layout(explorer=explorer.save())
         print("Luego de instanciar el test_layout")
 
 
@@ -560,29 +497,116 @@ def populate_filtros_options(stored):
     #print(stored)
     return stored,
 
+
+@app.callback(
+    [Output(component_id='store-explorer', component_property='data')],
+    [Input(component_id='btn-zoomin', component_property='n_clicks'),
+     Input(component_id='filtros-dropdown', component_property='value'),
+     Input(component_id='slider_num_clusters', component_property='value')
+     ],
+    [State(component_id='store-explorer', component_property='data'),
+     State(component_id='store-data', component_property='data'),
+     State(component_id='cluster_seleccionado', component_property='value'),
+     ]
+)
+def update_explorer(zoomin_nclicks, keys, n_clusters, explorer_as_dict, stored_data, selected_cluster):
+    dataset = pd.DataFrame(stored_data)
+    explorer = core.ParetoFrontExplorer()
+    # print("Explorer: {}".format(explorer_as_dict))
+    # print("Cargó el explorer")
+    # print("Estos son los índices que se cargaron:\n{}".format(explorer.actual_state.indexes))
+
+    print("Por levantar el explorer")
+    #print(explorer_as_dict)
+    explorer.load(explorer_as_dict)
+    #print(explorer_as_dict)
+    #print(explorer.save())
+    print("Explorer loaded")
+
+    # get triggered event from callback_context
+    ctx = dash.callback_context
+
+    # Filtrado
+    if ctx.triggered:
+        trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+        if trigger_id == 'slider_num_clusters':
+            print("Entró al cluster del explorer")
+            explorer.cluster(n_clusters)
+            print("Salió del cluster")
+            #print(explorer.save())
+        if trigger_id == 'btn-zoomin':
+            explorer.zoom_in(selected_cluster)
+            explorer.cluster(n_clusters)
+        if trigger_id == 'filtros-dropdown':
+            # Estoy prácticamente seguro de que esta lógica se puede encapsular dentro del explorer, deuda técnica
+            if keys is not None:
+                #if explorer.actual_state.filters is not None:
+                    # Primero hay que deshacer el último filter para pasar correctamente los filtros
+
+                #    print("Undoing command")
+                #    print(explorer.save())
+                #    explorer.undo()
+                #    print("Undone command")
+                #    print(explorer.actual_state.__dict__())
+                #dataset = dataset.loc[explorer.actual_state.indexes]
+                print("Por generar los filtros")
+                dict_filtros = generar_filtros(dataset, keys)
+                print("Filtros generados")
+                explorer.apply_filter(dict_filtros)
+                print("Explorer terminó de aplicar filtros")
+
+    #print(stored)
+    print("Explorer que devolvemos")
+    print(explorer.save())
+    return explorer.save(),
+
 @app.callback(
     [Output(component_id='data-table2', component_property='data'),
     Output(component_id='data-table2', component_property='columns')],
     [Input(component_id='store-data', component_property='data'),
-     Input(component_id='store-explorer', component_property='data')]
+     Input(component_id='store-explorer', component_property='data')],
+    [State(component_id='store-reqs', component_property='data'),
+     State(component_id='store-stks', component_property='data')]
 )
 
-def test_table(stored_data, explorer_as_dict):
-    #print("Test_Table")
+def test_table(stored_data, explorer_as_dict, requirements, stakeholders):
+    print("Test_Table")
     dataset = pd.DataFrame(stored_data)
+    #requirements = pd.DataFrame(stored_requirements)
+    #stakeholders = pd.DataFrame(stored_stakeholders)
     explorer = core.ParetoFrontExplorer()
     #print("Explorer: {}".format(explorer_as_dict))
-    explorer.load(explorer_as_dict)
-    #print("Cargó el explorer")
-    #print("Estos son los índices que se cargaron:\n{}".format(explorer.actual_state.indexes))
+    try:
+        explorer.load(explorer_as_dict)
+        print("Cargó el explorer")
+        print("Este es el explorer cargado:\n{}".format(explorer.save()))
+    except Exception as ex:
+        print("Algo salió mal\n{}".format(ex))
+
     dataset = dataset.loc[explorer.actual_state.indexes]
 
     # si clusters está disponible en el estado agregarlo como última columna
 
     if explorer.actual_state.clusters is not None:
         print("Entró a agregar la columna de clusters en la tabla")
-        dataset["clusters"] = explorer.actual_state.clusters
+        dataset["clusters"] = [explorer.actual_state.clusters[idx] for idx in dataset.index]
         print("Salió de agregar la columna de clusters en la tabla")
+
+    datatable = dataset.sort_values(by=['id'], inplace=False).to_dict('records')
+
+    for data_line in datatable:
+        req_list = []
+        stk_list = []
+        # Requirements
+        for req_index in range(len(data_line["reqs"])):
+            if data_line["reqs"][req_index] == "1":
+                req_list.append(requirements[str(req_index)]["id"])
+        # StakeHolders
+        for stk_index in range(len(data_line["stks"])):
+            if data_line["stks"][stk_index] == "1":
+                stk_list.append(stakeholders[str(stk_index)]["id"])
+        data_line["reqs"] = ", ".join(req_list)
+        data_line["stks"] = ", ".join(stk_list)
 
     datacolumns = []
     for i in dataset.columns:
@@ -593,51 +617,189 @@ def test_table(stored_data, explorer_as_dict):
     #print(datacolumns)
 
     # Ojo que tal vez hay que hacer un no_update si el último comando no actualizó indexes
-    return dataset.to_dict('records'), datacolumns
+    return datatable, datacolumns
 
 @app.callback(
-    [Output(component_id='store-explorer', component_property='data')],
-    Input(component_id='filtros-dropdown', component_property='value'),
-    [State(component_id='store-explorer', component_property='data'),
-     State(component_id='store-data', component_property='data')]
+    Output(component_id='profit_cost_graph', component_property='figure'),
+    [Input(component_id='store-data', component_property='data'),
+     Input(component_id='store-explorer', component_property='data')]
 )
-def update_explorer(keys, explorer_as_dict, stored_data):
+def plot_profit_cost_graph(stored_data, explorer_as_dict):
     dataset = pd.DataFrame(stored_data)
+    # requirements = pd.DataFrame(stored_requirements)
+    # stakeholders = pd.DataFrame(stored_stakeholders)
     explorer = core.ParetoFrontExplorer()
     # print("Explorer: {}".format(explorer_as_dict))
-    # print("Cargó el explorer")
-    # print("Estos son los índices que se cargaron:\n{}".format(explorer.actual_state.indexes))
+    try:
+        explorer.load(explorer_as_dict)
+        print("Cargó el explorer")
+        print("Este es el explorer cargado:\n{}".format(explorer.save()))
+    except Exception as ex:
+        print("Algo salió mal\n{}".format(ex))
 
-    print("Por levantar el explorer")
-    explorer.load(explorer_as_dict)
-    print(explorer_as_dict)
-    print(explorer.save())
-    print("Explorer loaded")
+    dataset = dataset.loc[explorer.actual_state.indexes]
 
-    # get triggered event from callback_context
-    ctx = dash.callback_context
+    # si clusters está disponible en el estado agregarlo como última columna
 
-    # Filtrado
-    if ctx.triggered:
-        trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
-        if trigger_id == 'filtros-dropdown':
-            if keys is not None:
-                if explorer.actual_state.filters is not None:
-                    print("Undoing command")
-                    print(explorer.save())
-                    explorer.undo()
-                    print("Undone command")
-                    print(explorer.actual_state.__dict__())
-                dataset = dataset.loc[explorer.actual_state.indexes]
-                print("Por generar los filtros")
-                array_filtros = generar_filtros(dataset, keys)
-                print("Filtros generados")
-                explorer.apply_filter(array_filtros)
-                print("Explorer terminó de aplicar filtros")
-    #print(stored)
-    print("Explorer que devolvemos")
-    print(explorer.save())
-    return explorer.save(),
+    if explorer.actual_state.clusters is not None:
+        print("Entró a agregar la columna de clusters en la tabla")
+        dataset["clusters"] = [explorer.actual_state.clusters[idx] for idx in dataset.index]
+        print("Salió de agregar la columna de clusters en la tabla")
+
+    pcg = px.scatter(dataset, x="profit", y="cost", color="clusters", hover_data=['id'])
+    pcg.update_layout(coloraxis_showscale=False, margin=dict(l=0, r=0, b=0, t=0), legend_orientation='h')
+    return pcg
+
+@app.callback(
+    Output(component_id='dendrogram_graph', component_property='figure'),
+    Input(component_id='store-explorer', component_property='data')
+)
+def plot_dendrogram(explorer_as_dict):
+    explorer = core.ParetoFrontExplorer()
+    # print("Explorer: {}".format(explorer_as_dict))
+    try:
+        explorer.load(explorer_as_dict)
+        print("Cargó el explorer")
+        print("Este es el explorer cargado:\n{}".format(explorer.save()))
+    except Exception as ex:
+        print("Algo salió mal\n{}".format(ex))
+
+    dn = ff.create_dendrogram(explorer.actual_state.linkage_matrix)
+
+    dn.update_xaxes(showticklabels=False)
+    dn.update_yaxes(showticklabels=False)
+    dn.update_layout(margin=dict(l=0, r=0, b=0, t=0))
+    return dn
+
+@app.callback(
+    Output(component_id='box_plot_graph', component_property='figure'),
+    [Input(component_id='store-data', component_property='data'),
+     Input(component_id='store-explorer', component_property='data'),
+     Input(component_id='y-axis-boxplot', component_property='value')]
+)
+def plot_boxplot_graph(stored_data, explorer_as_dict, y_input):
+    dataset = pd.DataFrame(stored_data)
+    # requirements = pd.DataFrame(stored_requirements)
+    # stakeholders = pd.DataFrame(stored_stakeholders)
+    explorer = core.ParetoFrontExplorer()
+    # print("Explorer: {}".format(explorer_as_dict))
+    try:
+        explorer.load(explorer_as_dict)
+        print("Cargó el explorer")
+        print("Este es el explorer cargado:\n{}".format(explorer.save()))
+    except Exception as ex:
+        print("Algo salió mal\n{}".format(ex))
+
+    dataset = dataset.loc[explorer.actual_state.indexes]
+
+    # si clusters está disponible en el estado agregarlo como última columna
+
+    if explorer.actual_state.clusters is not None:
+        print("Entró a agregar la columna de clusters en la tabla")
+        dataset["clusters"] = [explorer.actual_state.clusters[idx] for idx in dataset.index]
+        print("Salió de agregar la columna de clusters en la tabla")
+
+    fig = px.box(dataset, x="clusters", y=y_input)
+
+    return fig  # returned objects are assigned to the component property of the Output
+
+@app.callback(
+    [Output(component_id='data-table-statistics', component_property='data'),
+     Output(component_id='data-table-statistics', component_property='columns')
+    ],
+    [Input(component_id='store-data', component_property='data'),
+     Input(component_id='store-explorer', component_property='data')]
+)
+def write_statistics(stored_data, explorer_as_dict):
+    print("Write Statistics")
+    dataset = pd.DataFrame(stored_data)
+    # requirements = pd.DataFrame(stored_requirements)
+    # stakeholders = pd.DataFrame(stored_stakeholders)
+    explorer = core.ParetoFrontExplorer()
+    # print("Explorer: {}".format(explorer_as_dict))
+    try:
+        explorer.load(explorer_as_dict)
+        print("Cargó el explorer")
+        print("Este es el explorer cargado:\n{}".format(explorer.save()))
+    except Exception as ex:
+        print("Algo salió mal\n{}".format(ex))
+
+    dataset = dataset.loc[explorer.actual_state.indexes]
+
+    # si clusters está disponible en el estado agregarlo como última columna
+
+    if explorer.actual_state.clusters is None:
+        raise dash.exceptions.PreventUpdate("Can't calc statistics if clusters is not set")
+    else:
+        print("Entró a agregar la columna de clusters en la tabla")
+        dataset["clusters"] = [explorer.actual_state.clusters[idx] for idx in dataset.index]
+        print("Salió de agregar la columna de clusters en la tabla")
+        stats = dataset[["id", "clusters", "cost", "profit"]].groupby("clusters").agg({'id': 'count',
+                                                                                         'profit': ['min', 'median', 'max', 'std'],
+                                                                                         'cost':['min', 'median', 'max', 'std']})
+        stats.columns = ['_'.join(col) for col in stats.columns.values]
+
+        stats = stats.reset_index(names="cluster") # Para que se vea el número de cluster
+
+        datacolumns = []
+        for i in stats.columns:
+            col_options = {"name": i, "id": i}
+            datacolumns.append(col_options)
+
+    return stats.to_dict('records'), datacolumns  # returned objects are assigned to the component property of the Output
+
+@app.callback(
+    Output(component_id='treemaps-graph', component_property='figure'),
+    [Input(component_id='store-data', component_property='data'),
+     Input(component_id='store-explorer', component_property='data'),
+     Input(component_id='store-reqs', component_property='data'),
+     Input(component_id='store-stks', component_property='data'),]
+)
+def plot_treemaps_graphs(stored_data, explorer_as_dict, requirements, stakeholders):
+    dataset = pd.DataFrame(stored_data)
+    # requirements = pd.DataFrame(stored_requirements)
+    # stakeholders = pd.DataFrame(stored_stakeholders)
+    explorer = core.ParetoFrontExplorer()
+    # print("Explorer: {}".format(explorer_as_dict))
+    try:
+        explorer.load(explorer_as_dict)
+        print("Cargó el explorer")
+        print("Este es el explorer cargado:\n{}".format(explorer.save()))
+    except Exception as ex:
+        print("Algo salió mal\n{}".format(ex))
+
+    dataset = dataset.loc[explorer.actual_state.indexes]
+
+    # si clusters está disponible en el estado agregarlo como última columna
+
+    if explorer.actual_state.clusters is None:
+        raise dash.exceptions.PreventUpdate("Can't calc statistics if clusters is not set")
+
+    print("Entró a agregar la columna de clusters en la tabla")
+    dataset["clusters"] = [explorer.actual_state.clusters[idx] for idx in dataset.index]
+    print("Salió de agregar la columna de clusters en la tabla")
+
+    tmreq = plot_treemaps(dataset, "reqs", requirements, explorer.actual_state.level)
+    tmstk = plot_treemaps(dataset, "stks", stakeholders, explorer.actual_state.level)
+
+    fig = make_subplots(
+        2, NCLUSTERS := len(tmreq.keys()),
+        #column_widths=[1./NCLUSTERS for _ in range(NCLUSTERS)],
+        #subplot_titles=([cluster for cluster in tmreq.keys()] + [cluster for cluster in tmstk.keys()]),
+        specs=[[{'type':'domain'} for _ in range(NCLUSTERS)] for _ in range(2)],
+        horizontal_spacing=0.01,
+        vertical_spacing=0.05
+    )
+
+    for i, tm in enumerate(tmreq.values()):
+        fig.add_trace(tm, 1, i+1)
+
+    for i, tm in enumerate(tmstk.values()):
+        fig.add_trace(tm, 2, i+1)
+
+    fig.update_layout(margin=dict(t=15, l=5, r=5, b=15))
+
+    return fig
 
 if __name__ == '__main__':
     app.run_server(debug=True, dev_tools_ui=modo_desarrollador, dev_tools_props_check=modo_desarrollador)
