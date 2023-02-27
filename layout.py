@@ -167,8 +167,19 @@ test_layout = lambda explorer: html.Div([
                      placeholder="Filter solutions that include..."
                  ),
                  html.Hr()])
-              ])
+              ]),
+    html.P("Box plot graph", style={'text-align': 'left'}),
+    html.Div([
+    html.P("y-axis:"),
+        dcc.RadioItems(
+            id='y-axis-boxplot',
+            options=['profit', 'cost'],
+            value='profit',
+            inline=True
+        ),
+        dcc.Graph(id='box_plot_graph', figure={})
     ])
+])
 
 
 layout = html.Div([
