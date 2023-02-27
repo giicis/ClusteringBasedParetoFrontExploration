@@ -1,6 +1,7 @@
 import collections
 import operator
 from functools import reduce
+from itertools import count
 
 import plotly.express as px  # (version 4.7.0)
 import plotly.graph_objects as go
@@ -10,6 +11,7 @@ import pandas as pd
 import numpy as np
 import math
 
+from dash import no_update
 from plotly.subplots import make_subplots
 from scipy.cluster.hierarchy import linkage, dendrogram, cut_tree, fcluster
 from scipy.spatial.distance import squareform, pdist
@@ -52,54 +54,6 @@ def generar_filtros(data, keys):
             filtro[r] = np.logical_and(filtro[r], data[categoria][r][int(index)] == '1')
 
     return filtro
-
-
-distance_matrix = None
-
-
-# Statistics--------------------------------------------------------------------------
-def cluster_statistics(indices, nivel, n_generado_de_clusters):
-    """
-    Statistics of each cluster
-    :param indices: list of boolean that indicates which rows are going to be clustered.
-    :param nivel: level of clustering zoom.
-    :n_generado_de_clusters: number of generated clusters (int)
-    :return: dictionary of statistics
-    """
-    global data
-
-    df = data.loc[indices]
-    estadisticos = {}
-    for c in range(1, n_generado_de_clusters + 1):
-        cluster_elements = df.loc[df["Level {}".format(nivel)] == str(c)]
-
-        stat = {
-            'n_elementos': len(cluster_elements),
-            'profit_min': cluster_elements.profit.min(),
-            'profit_median': cluster_elements.profit.median(),
-            'profit_max': cluster_elements.profit.max(),
-            'profit_SD': cluster_elements.profit.std(),
-            'cost_min': cluster_elements.cost.min(),
-            'cost_median': cluster_elements.cost.median(),
-            'cost_max': cluster_elements.cost.max(),
-            'cost_SD': cluster_elements.cost.std(),
-        }
-
-        estadisticos[c] = stat
-    return estadisticos
-
-
-## Plotting----------------------------------------
-def fill(array):
-    """
-    Fills an array with empty dicts
-    :param array: array to be filled
-    :return: the filled array
-    """
-    faltantes = MAXCLUST - len(array)
-    for x in range(faltantes):
-        array.append({})
-    return array
 
 
 def plot_treemaps(dataset, dim, categorias, nivel):
@@ -191,106 +145,6 @@ def plot_treemaps(dataset, dim, categorias, nivel):
     return dict_treemaps
 
 
-def plot_all(nivel, n_deseado_de_clusters, array_filtros):
-    """
-    Runs the clustering algorithm and generates a dendogram, cluster statistics and treemaps, and a dispersion graph.
-    :param nivel: level of clustering zoom.
-    :n_deseado_de_clusters: maximum number of clusters to be generated.
-    :y_axis_bp: y-axis of box plot.
-    :return: control variables, graphs to be displayed.
-    """
-    global data
-    global requirements
-    global stakeholders
-
-    error = False
-    try:
-        # Applies the filters on each stage of clustering (this avoids errors when zooming out after applying filters)
-        for n in range(nivel + 1):
-            indices = np.logical_and(obtener_indices(n), array_filtros)
-            if not (any(indices)):
-                # An exception is raised if the resulting boolean array is all False
-                raise Exception("There are no solutions that fulfill all restrictions")
-            #(linkage_matrix, n_generado_de_clusters) = algoritmo_clustering(indices, n_deseado_de_clusters, n)
-    except:
-        error = True
-        return (error, True, [], {}, {}, {}, {}, {}, "", "", "", "", {}, {}, {}, {}, {})
-
-    #dn = ff.create_dendrogram(linkage_matrix)
-
-    dn.update_xaxes(showticklabels=False)
-    dn.update_yaxes(showticklabels=False)
-    dn.update_layout(margin=dict(l=0, r=0, b=0, t=0))
-
-    wcreq = plot_treemaps(indices, "reqs", requirements, nivel)
-    wcstk = plot_treemaps(indices, "stks", stakeholders, nivel)
-
-    estadisticos = cluster_statistics(indices, nivel, n_generado_de_clusters)
-    stat = {1: "", 2: "", 3: "", 4: "", 5: "", 6: "", 7: "", 8: ""}
-    for clus in range(1, n_generado_de_clusters + 1):
-        stat[
-            clus] = "Cluster {}\nElement count:\t{}\nProfit min:\t{}\nProfit median:\t{}\nProfit max:\t{}\nProfit SD:\t{}\nCost min:\t{}\nCost median:\t{}\nCost max:\t{}\nCost SD:\t{}".format(
-            clus, estadisticos[clus]['n_elementos'], estadisticos[clus]['profit_min'],
-            estadisticos[clus]['profit_median'], estadisticos[clus]['profit_max'], estadisticos[clus]['profit_SD'],
-            estadisticos[clus]['cost_min'], estadisticos[clus]['cost_median'], estadisticos[clus]['cost_max'],
-            estadisticos[clus]['cost_SD'])
-
-    pcg = px.scatter(data.loc[indices], x="profit", y="cost", color=("Level {}".format(nivel)), hover_data=['id'])
-    pcg.update_layout(coloraxis_showscale=False, margin=dict(l=0, r=0, b=0, t=0))
-
-    # DataTable
-    datatable = data.loc[indices].__dict__('records')
-    ##Replace datatable requirementes and stakeholders
-    for data_line in datatable:
-        req_list = []
-        stk_list = []
-        # Requirements
-        for req_index in range(len(data_line["reqs"])):
-            if data_line["reqs"][req_index] == "1":
-                req_list.append(requirements[str(req_index)]["id"])
-        # StakeHolders
-        for stk_index in range(len(data_line["stks"])):
-            if data_line["stks"][stk_index] == "1":
-                stk_list.append(stakeholders[str(stk_index)]["id"])
-        data_line["reqs"] = ", ".join(req_list)
-        data_line["stks"] = ", ".join(stk_list)
-    # DataColumns
-    datacolumns = []
-    for i in data.columns:
-        col_options = {"name": i, "id": i}
-        if i == "id":
-            col_options["type"] = "numeric"
-        datacolumns.append(col_options)
-    # EndDataTable
-
-    # Disable zoomin if there are no clusters to choose
-    deshabilitar_zoomin = (n_generado_de_clusters <= 1)
-    # You can't zoom in a cluster with less than 3 solutions
-    options = [{'label': 'Cluster{}'.format(c), 'value': c, 'disabled': (estadisticos[c]['n_elementos'] <= 2)} for c in
-               range(1, n_generado_de_clusters + 1)]
-    return (
-    error, deshabilitar_zoomin, options, dn, wcreq[0], wcreq[1], wcreq[2], wcreq[3], stat[1], stat[2], stat[3], stat[4],
-    wcstk[0], wcstk[1], wcstk[2], wcstk[3], pcg, datatable, datacolumns)
-
-
-def obtener_indices(nivel):
-    """
-    Generates the boolean array used to filter the pareto-front by its level of clustering zoom
-    :param nivel: level of clustering zoom.
-    :return: boolean array
-    """
-    global data
-    global cluster_por_nivel
-
-    if nivel >= 1:
-        # obtiene los indices de las filas cuya última columna de cluster coincide con
-        # el ultimo cluster elegido. Es un array de booleanos.
-        indices = data["Level {}".format(nivel - 1)] == cluster_por_nivel[nivel - 1]
-    else:
-        indices = [True] * len(data)
-    return indices
-
-
 def validate_files(list_upload):
     data_isok = False
     reqs_isok = False
@@ -373,52 +227,15 @@ def upload_data(list_contents, list_filenames):
     :content: .json file that contains the dataframe.
     :return: a boolean that disables the "Continue" button and a graph of the dataframe.
     """
-    #global data
-    #global requirements
-    #global stakeholders
-    #global palabras_clave
 
-    #continue_disabled = True
     list_upload = dict(zip(list_filenames, list_contents))
     error_list = validate_files(list_upload)
     print(error_list)
-    #dataset = []
+
     continue_disabled = not (error_list == [])
-    #if (error_list == []):
-        #continue_disabled = False
-
-        #content_type, content_string = list_upload["pareto_front.json"].split(',')
-        #decoded = base64.b64decode(content_string)
-        #data = pd.read_json(io.BytesIO(decoded), orient='index', dtype={'reqs': str, 'stks': str})
-
-        #content_type, content_string = list_upload["requirements.json"].split(',')
-        #requirements = ast.literal_eval((base64.b64decode(content_string)).decode("UTF-8"))
-
-        #content_type, content_string = list_upload["stakeholders.json"].split(',')
-        #stakeholders = ast.literal_eval((base64.b64decode(content_string)).decode("UTF-8"))
-
-
-        #dataset = data.to_dict('records')
-
-        #print(dataset[0], requirements, stakeholders)
-
-        #print(type(dataset), type(requirements), type(stakeholders))
-
-        #palabras_clave = []
-        #for x in range(len(requirements)):
-        #    palabras_clave.append({
-        #        'label': requirements[str(x)]['id'],
-        #        'value': "reqs,{}".format(x)
-        #    })
-        #for x in range(len(stakeholders)):
-        #    palabras_clave.append({
-        #        'label': stakeholders[str(x)]['id'],
-        #        'value': "stks,{}".format(x)
-        #    })
 
     reporte_errores = "".join(["\n* " + error for error in error_list])
-    #for error in error_list:
-    #    reporte_errores += "\n* " + error
+
     return continue_disabled, reporte_errores
 
 
@@ -561,6 +378,48 @@ def update_explorer(zoomin_nclicks, keys, n_clusters, explorer_as_dict, stored_d
     return explorer.save(),
 
 @app.callback(
+    [Output(component_id='btn-zoomin', component_property='disabled'),
+     Output(component_id='btn-zoomout', component_property='disabled'),
+     Output(component_id='btn-restore', component_property='disabled'),
+     Output(component_id='cluster_seleccionado', component_property='options'),
+     Output(component_id='cluster_seleccionado', component_property='value'),
+     Output(component_id='slider_nivel', component_property='marks'),
+     Output(component_id='slider_nivel', component_property='value'),
+     ],
+    Input(component_id='store-explorer', component_property='data')
+)
+def manage_ui_controls(explorer_as_dict):
+    explorer = core.ParetoFrontExplorer()
+    try:
+        explorer.load(explorer_as_dict)
+        print("Cargó el explorer")
+        print("Este es el explorer cargado:\n{}".format(explorer.save()))
+    except Exception as ex:
+        print("Algo salió mal\n{}".format(ex))
+
+    cluster_seleccionado_options = no_update
+    zoomin_disabled = False
+    zoomout_disabled = True
+    restore_disabled = True
+    cluster_seleccionado_value = None
+
+    if explorer.actual_state.clusters is not None:
+        clusters_set = set(explorer.actual_state.clusters.values())
+        clusters_count = {c: list(explorer.actual_state.clusters.values()).count(c) for c in clusters_set}
+        cluster_seleccionado_options = [{'label': 'Cluster{}'.format(c), 'value': c, 'disabled': (clusters_count[c] <= 2)}
+                                        for c in clusters_set]
+
+        zoomin_disabled = all([option['disabled'] for option in cluster_seleccionado_options])
+        cluster_seleccionado_value = None if zoomin_disabled else [option['value'] for option in cluster_seleccionado_options][0]
+        zoomout_disabled = explorer.actual_state.level == 0
+        restore_disabled = explorer.actual_state.level == 0
+
+    slider_nivel_marks = {i:str(i) for i in range(explorer.actual_state.level+1)}
+
+    return zoomin_disabled, zoomout_disabled, restore_disabled, cluster_seleccionado_options, cluster_seleccionado_value, slider_nivel_marks, explorer.actual_state.level
+
+
+@app.callback(
     [Output(component_id='data-table2', component_property='data'),
     Output(component_id='data-table2', component_property='columns')],
     [Input(component_id='store-data', component_property='data'),
@@ -643,11 +502,11 @@ def plot_profit_cost_graph(stored_data, explorer_as_dict):
 
     if explorer.actual_state.clusters is not None:
         print("Entró a agregar la columna de clusters en la tabla")
-        dataset["clusters"] = [explorer.actual_state.clusters[idx] for idx in dataset.index]
+        dataset["clusters"] = [str(explorer.actual_state.clusters[idx]) for idx in dataset.index]
         print("Salió de agregar la columna de clusters en la tabla")
 
-    pcg = px.scatter(dataset, x="profit", y="cost", color="clusters", hover_data=['id'])
-    pcg.update_layout(coloraxis_showscale=False, margin=dict(l=0, r=0, b=0, t=0), legend_orientation='h')
+    pcg = px.scatter(dataset, x="profit", y="cost", color="clusters", hover_data=['id'], color_discrete_sequence=px.colors.qualitative.Safe)
+    pcg.update_layout(margin=dict(l=0, r=0, b=0, t=0))
     return pcg
 
 @app.callback(
