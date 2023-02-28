@@ -475,9 +475,11 @@ def plot_profit_cost_graph(stored_data, explorer_as_dict):
 
 @app.callback(
     Output(component_id='dendrogram_graph', component_property='figure'),
-    Input(component_id='store-explorer', component_property='data')
+    [Input(component_id='store-explorer', component_property='data'),
+     Input(component_id='show-ids-checkbox', component_property='value')
+     ]
 )
-def plot_dendrogram(explorer_as_dict):
+def plot_dendrogram(explorer_as_dict, show_ids):
     explorer = core.ParetoFrontExplorer()
 
     try:
@@ -493,7 +495,7 @@ def plot_dendrogram(explorer_as_dict):
 
     dn = ff.create_dendrogram(explorer.actual_state.linkage_matrix, linkagefun=lambda x: explorer.actual_state.linkage_matrix, color_threshold=color_treshold, colorscale=['#d73027', '#d81b60', '#ffc107', '#4575b4', '#fc8d59', '#1e88e5', '#91bfdb', '#fee090'])
 
-    dn.update_xaxes(showticklabels=False)
+    dn.update_xaxes(showticklabels=True if show_ids else False)
     #dn.update_yaxes(showticklabels=False)
     dn.update_layout(margin=dict(l=0, r=0, b=0, t=0))
     return dn
