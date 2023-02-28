@@ -160,5 +160,11 @@ layout = html.Div([
     dcc.Store(id='store-reqs', data=[], storage_type='memory'),
     dcc.Store(id='store-stks', data=[], storage_type='memory'),
     dcc.Store(id='store-keys', data=[], storage_type='memory'),
+    dcc.Loading(
+        id="loading-1",
+        type="default",
+        children=html.Div(id="loading-output-1"),
+        fullscreen=True,
+    ),
     html.Div(id='page_content', children=start_layout, style={'font-family' : 'helvetica'})
 ])

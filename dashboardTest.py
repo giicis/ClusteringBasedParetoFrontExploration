@@ -10,6 +10,7 @@ import plotly.figure_factory as ff
 import pandas as pd
 import numpy as np
 import math
+import time
 
 from dash import no_update
 from plotly.subplots import make_subplots
@@ -237,6 +238,7 @@ def upload_data(list_contents, list_filenames):
      Output(component_id='store-reqs', component_property='data'),
      Output(component_id='store-stks', component_property='data'),
      Output(component_id='store-keys', component_property='data'),
+     Output(component_id="loading-output-1", component_property= 'children'),
      #Output(component_id='store-explorer', component_property='data')
     ],
     [Input(component_id='btn-continue', component_property='n_clicks')],
@@ -294,7 +296,7 @@ def start(n_clicks, list_contents, list_filenames):
         #print("Luego de instanciar el test_layout")
 
 
-    return layout, dataset, requirements, stakeholders, palabras_clave
+    return layout, dataset, requirements, stakeholders, palabras_clave, {'display': 'none'}
 
 @app.callback(
     [Output(component_id='filtros-dropdown', component_property='options')],
