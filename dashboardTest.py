@@ -485,10 +485,16 @@ def plot_dendrogram(explorer_as_dict):
     except Exception as ex:
         print("Algo salió mal durante la carga del explorer en plot_dendrogram\n{}".format(ex))
 
-    dn = ff.create_dendrogram(explorer.actual_state.linkage_matrix)
+    color_treshold = None
+    if explorer.actual_state.clusters is not None:
+        n_clusters = len(set(explorer.actual_state.clusters.values()))
+        pos = max(-n_clusters+1, -len(explorer.actual_state.linkage_matrix))
+        color_treshold = explorer.actual_state.linkage_matrix[pos, 2] - 0.001
+
+    dn = ff.create_dendrogram(explorer.actual_state.linkage_matrix, linkagefun=lambda x: explorer.actual_state.linkage_matrix, color_threshold=color_treshold, colorscale=['#d73027', '#d81b60', '#ffc107', '#4575b4', '#fc8d59', '#1e88e5', '#91bfdb', '#fee090'])
 
     dn.update_xaxes(showticklabels=False)
-    dn.update_yaxes(showticklabels=False)
+    #dn.update_yaxes(showticklabels=False)
     dn.update_layout(margin=dict(l=0, r=0, b=0, t=0))
     return dn
 

@@ -6,6 +6,8 @@ from dash import dcc
 from dash import html
 from dash import dash_table
 
+import dash_loading_spinners as dls
+
 #from dash_holoniq_wordcloud import DashWordcloud
 
 # Constantes
@@ -98,10 +100,19 @@ main_layout = lambda explorer: html.Div([
             ])
         ]),
 
-
     html.Div([
-        dcc.Graph(id='profit_cost_graph', responsive=True, style={'height': '30vw'}),
-        dcc.Graph(id='dendrogram_graph', responsive=True, style={'height': '18vw'}),
+        dls.Hash(
+            dcc.Graph(id='profit_cost_graph', responsive=True, style={'height': '30vw'}),
+            color="#435278",
+            speed_multiplier=2,
+            size=100),
+        ], style={'columnCount': 1}),
+    html.Div([
+        dls.Hash(
+            dcc.Graph(id='dendrogram_graph', responsive=True, style={'height': '18vw'}),
+            color="#435278",
+            speed_multiplier=2,
+            size=100),
         ], style={'columnCount': 1}),
     html.Div([html.H3("Data Table", style={'text-align': 'center'}),
              dash_table.DataTable(data=[], columns=[], id='data-table2', page_size=10,
@@ -118,7 +129,12 @@ main_layout = lambda explorer: html.Div([
             value='profit',
             inline=True
         ),
-        dcc.Graph(id='box_plot_graph', figure={})
+        dls.Hash(
+            dcc.Graph(id='box_plot_graph', figure={}),
+            color="#435278",
+            speed_multiplier=2,
+            size=100,
+        )
     ], style={'columnCount': 1}),
     html.Hr(),
     html.Div([html.H3("Statistics", style={'text-align': 'center'}),
@@ -127,59 +143,14 @@ main_layout = lambda explorer: html.Div([
                                   )], style={'columnCount': 1}),
     html.Hr(),
     html.Div([
-        dcc.Graph(id='treemaps-graph', responsive=True, style={'height': '75vw'}),
-        ], style={'columnCount': 1}),
+        dls.Hash(
+            dcc.Graph(id='treemaps-graph', responsive=True, style={'height': '75vw'}),
+            color="#435278",
+            speed_multiplier=2,
+            size=100,
+        )
+    ], style={'columnCount': 1}),
     ])
-
-test_layout = lambda explorer: html.Div([
-    html.Div([html.H3("Dashboard", style={'text-align': 'center'}),
-              dcc.Store(id='store-explorer', data=explorer),
-              html.Button('Zoom in', id='btn-zoomin', style={'font-family' : 'helvetica', 'width': "33%", 'height': "20%"}, disabled=False),
-              dcc.RadioItems(
-                id="cluster_seleccionado",
-                value=1,
-                # list comprehension to save time avoiding loops
-                options=[{'label': 'Cluster{}'.format(c), 'value': c} for c in range(1, MAXCLUST + 1)],
-                labelStyle={'display': 'inline-block'},
-                inline=True
-                ),
-            html.Br(),
-            html.Div(children='Desired number of clusters', style={'text-align': 'left'}),
-            dcc.Slider(
-                id="slider_num_clusters",
-                min=2,
-                max=MAXCLUST,
-                value=MAXCLUST,
-                step=1,
-                # dict from list comprehension to save time avoiding loops
-                marks=dict(zip(range(2, MAXCLUST+1), [str(x) for x in range(2, MAXCLUST+1)])),
-                included=False,
-                ),
-              dash_table.DataTable(data=[], columns=[], id='data-table2', page_size=10,
-                                   style_table={'overflowX': 'auto'},
-                                   ),
-              html.Div([
-                 dcc.Dropdown(
-                     id='filtros-dropdown',
-                     options=[],
-                     value=None,
-                     multi=True,
-                     placeholder="Filter solutions that include..."
-                 ),
-                 html.Hr()])
-              ]),
-    html.P("Box plot graph", style={'text-align': 'left'}),
-    html.Div([
-    html.P("y-axis:"),
-        dcc.RadioItems(
-            id='y-axis-boxplot',
-            options=['profit', 'cost'],
-            value='profit',
-            inline=True
-        ),
-        dcc.Graph(id='box_plot_graph', figure={})
-    ])
-])
 
 
 layout = html.Div([
@@ -189,4 +160,4 @@ layout = html.Div([
     dcc.Store(id='store-stks', data=[], storage_type='memory'),
     dcc.Store(id='store-keys', data=[], storage_type='memory'),
     html.Div(id='page_content', children=start_layout, style={'font-family' : 'helvetica'})
- ])
+])
