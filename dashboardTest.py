@@ -505,7 +505,7 @@ def plot_profit_cost_graph(stored_data, explorer_as_dict):
         dataset["clusters"] = [str(explorer.actual_state.clusters[idx]) for idx in dataset.index]
         print("Salió de agregar la columna de clusters en la tabla")
 
-    pcg = px.scatter(dataset, x="profit", y="cost", color="clusters", hover_data=['id'], color_discrete_sequence=px.colors.qualitative.Safe)
+    pcg = px.scatter(dataset, x="profit", y="cost", color="clusters", hover_data=['id'], color_discrete_sequence=['#d73027', '#fc8d59', '#fee090', '#4575b4', '#91bfdb'])
     pcg.update_layout(margin=dict(l=0, r=0, b=0, t=0))
     return pcg
 
