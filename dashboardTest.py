@@ -385,7 +385,7 @@ def manage_ui_controls(explorer_as_dict):
         cluster_seleccionado_options = [{'label': 'Cluster{}'.format(c), 'value': c, 'disabled': not explorer.can_zoomin(c)}
                                         for c in clusters_set]
 
-        zoomin_disabled = len(clusters_set) <= 1 or all([option['disabled'] for option in cluster_seleccionado_options])
+        zoomin_disabled = all([option['disabled'] for option in cluster_seleccionado_options])
         cluster_seleccionado_value = None if zoomin_disabled else [option['value'] for option in cluster_seleccionado_options][0]
         undo_disabled = not explorer.can_undo()
         restore_disabled = not explorer.can_restore()
