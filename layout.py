@@ -62,7 +62,7 @@ main_layout = lambda explorer: html.Div([
     html.Div([
         html.Div([
             html.Button('Restore', id='btn-restore', style={'font-family' : 'helvetica', 'width': "33%", 'height': "20%"}, disabled=True),
-            html.Button('Zoom out', id='btn-zoomout', style={'font-family' : 'helvetica', 'width': "33%", 'height': "20%"}, disabled=True),
+            html.Button('Undo', id='btn-undo', style={'font-family' : 'helvetica', 'width': "33%", 'height': "20%"}, disabled=True),
             html.Button('Zoom in', id='btn-zoomin', style={'font-family' : 'helvetica', 'width': "33%", 'height': "20%"}, disabled=False),
             dcc.RadioItems(
                 id="cluster_seleccionado",

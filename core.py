@@ -275,6 +275,8 @@ class ParetoFrontExplorer:
                 else self._build_state(command_as_dict["kwargs"]["state"])
         if "keys" in command_as_dict["kwargs"] and command_as_dict["kwargs"]["keys"] is not None:
             command_as_dict["kwargs"]["keys"] = {int(idx): tv for idx, tv in command_as_dict["kwargs"]["keys"].items()}
+        if "command_list" in command_as_dict["kwargs"]:
+            command_as_dict["kwargs"]["command_list"] = [self._build_command(subcommand_as_dict) for subcommand_as_dict in command_as_dict["kwargs"]["command_list"]]
         command = eval("core." + command_as_dict["classname"])(**command_as_dict["kwargs"])
         return command
 
@@ -320,6 +322,9 @@ class ParetoFrontExplorer:
         except:
             print("Algo pasó con el comando cluster")
 
+    def can_zoomin(self, selected_cluster):
+        return self._actual_state.clusters is not None and len([1 for value in self._actual_state.clusters.values() if value == selected_cluster]) > 1
+
     def zoom_in(self, selected_cluster):
         self._undone_commands.clear()
 
@@ -331,15 +336,37 @@ class ParetoFrontExplorer:
         except:
             print("Algo pasó con el comando zoom in")
 
+    def zoomin_then_cluster(self, selected_cluster, nclusters):
+        self._undone_commands.clear()
+
+        try:
+            zoomin_command = core.ZoomInCommand(selected_cluster)
+            cluster_command = core.ClusterCommand(nclusters)
+            composite_command = core.CompositeCommand([zoomin_command, cluster_command])
+            self._actual_state = composite_command.do(self._actual_state)
+            self._done_commands.append(composite_command)
+
+        except:
+            print("Algo pasó con el comando zoomin then cluster")
+
+    def can_undo(self):
+        return len(self._done_commands) > 1
+
     def undo(self):
         if len(self._done_commands) == 0:
             raise RuntimeError("Explorer cannot undo because no command has executed yet.")
         last_command = self._done_commands.pop()
-        self._actual_state = last_command.state
+        self._actual_state = last_command.undo()
         self._undone_commands.append(last_command)
+
+    def can_redo(self):
+        raise NotImplementedError("Redo is not yet implemented")
 
     def redo(self):
         raise NotImplementedError("Redo is not yet implemented")
+
+    def can_restore(self):
+        return len(self._done_commands) > 1
 
     def restore(self):
         if self._done_commands:

@@ -75,8 +75,6 @@ def plot_treemaps(dataset, dim, categorias, nivel):
     # esto habría que hacerlo 1 sola vez al principio cuando se carga el dataset
     # TODO: moverlo al lugar que corresponde
     keys_counts = reduce(operator.add, [collections.Counter(obj['keys']) for (pos, obj) in categorias.items()])
-    #print(categorias)
-    #print(keys_counts)
 
     # calculamos las frecuencias de cada categoría en cada solución
     keys_counts_per_solution = {
@@ -84,7 +82,6 @@ def plot_treemaps(dataset, dim, categorias, nivel):
                                  if dataset[dim][r][i] == '1'], collections.Counter()) for r in dataset["id"]}
 
     # calculamos cuán "cubierta" está cada palabra por las distintas soluciones:
-    #print("Antes de la normalizacion")
     for r, counter in keys_counts_per_solution.items():
         for key in counter.keys():
             counter[key] = counter[key] / keys_counts[key]
@@ -95,27 +92,22 @@ def plot_treemaps(dataset, dim, categorias, nivel):
     # Triangular membership function with abc = (a, b, c)
     trimf = lambda x, abc : max(0., min((x - abc[0])/(abc[1]-abc[0]), (x - abc[2])/(abc[1]-abc[2])))
 
-    print("Calculando las funciones de pertenencia")
-
     build_mf = lambda counter, abc: {key:trimf(count, abc) for key, count in dict(counter).items()}
     quantified_keys_membership_per_solution = {(q, r):collections.Counter(build_mf(counter, mf_fuzzy_quantifiers[q])) for r, counter in keys_counts_per_solution.items() for q in fuzzy_quantifiers}
-    level = "Level {}".format(nivel)  # lo asignamos antes por tema performance
-    print("Terminó el cálculo de las funciones de pertenencia")
 
     for c in cluster_set:  # se crea un treemap por cada cluster
-        print("Comenzamos con el cluster {}".format(c))
 
         df2 = dataset[dataset["clusters"] == c] # obtenemos sólo las filas del cluster
-        print("Calculando cantidad de filas")
+
         cluster_size = len(df2)
-        print("Calculando cardinales")
+
         quantified_keys_by_cluster = {(q, key): sum([quantified_keys_membership_per_solution[(q, r.id)][key] for r in df2.itertuples()]) for q in fuzzy_quantifiers for key in keys_counts.keys()}
-        print("Calculando borrosidades")
+
         fuzziness_keys_by_cluster = {(q, key): 2 * sum(
             [abs(quantified_keys_membership_per_solution[(q, r.id)][key] - (1 if quantified_keys_membership_per_solution[(q, r.id)][key] >= 0.5 else 0))
              for r in df2.itertuples()]
         )/cluster_size for q in fuzzy_quantifiers for key in keys_counts.keys()}
-        print("Fin de los cálculos")
+
         ids = ["{} {}".format(q, r) for (q, r), count in quantified_keys_by_cluster.items() if count]
 
         labels = ids
@@ -141,7 +133,6 @@ def plot_treemaps(dataset, dim, categorias, nivel):
         )
 
         dict_treemaps[str(c)] = treemap
-        print("Terminamos con el cluster {}".format(c))
     return dict_treemaps
 
 
@@ -151,7 +142,7 @@ def validate_files(list_upload):
     stks_isok = False
     error_list = []
 
-    print("Validating")
+    #print("Validating")
     if "pareto_front.json" in list_upload.keys():
         content_type, content_string = list_upload["pareto_front.json"].split(',')
         decoded = base64.b64decode(content_string)
@@ -230,7 +221,7 @@ def upload_data(list_contents, list_filenames):
 
     list_upload = dict(zip(list_filenames, list_contents))
     error_list = validate_files(list_upload)
-    print(error_list)
+    #print(error_list)
 
     continue_disabled = not (error_list == [])
 
@@ -297,10 +288,10 @@ def start(n_clicks, list_contents, list_filenames):
         linkage_matrix = linkage(distance_matrix, method="complete")
         explorer = core.ParetoFrontExplorer(state=core.ExplorerState(indexes=data.index, linkage_matrix=linkage_matrix))
         dataset = data.to_dict('records')
-        print("Antes de instanciar el test_layout")
+        #print("Antes de instanciar el test_layout")
         explorer.cluster(4)
         layout = main_layout(explorer=explorer.save())
-        print("Luego de instanciar el test_layout")
+        #print("Luego de instanciar el test_layout")
 
 
     return layout, dataset, requirements, stakeholders, palabras_clave
@@ -318,6 +309,8 @@ def populate_filtros_options(stored):
 @app.callback(
     [Output(component_id='store-explorer', component_property='data')],
     [Input(component_id='btn-zoomin', component_property='n_clicks'),
+     Input(component_id='btn-undo', component_property='n_clicks'),
+     Input(component_id='btn-restore', component_property='n_clicks'),
      Input(component_id='filtros-dropdown', component_property='value'),
      Input(component_id='slider_num_clusters', component_property='value')
      ],
@@ -326,19 +319,14 @@ def populate_filtros_options(stored):
      State(component_id='cluster_seleccionado', component_property='value'),
      ]
 )
-def update_explorer(zoomin_nclicks, keys, n_clusters, explorer_as_dict, stored_data, selected_cluster):
+def update_explorer(zoomin_nclicks, undo_nclicks, restore_nclicks, keys, n_clusters, explorer_as_dict, stored_data, selected_cluster):
     dataset = pd.DataFrame(stored_data)
     explorer = core.ParetoFrontExplorer()
-    # print("Explorer: {}".format(explorer_as_dict))
-    # print("Cargó el explorer")
-    # print("Estos son los índices que se cargaron:\n{}".format(explorer.actual_state.indexes))
 
-    print("Por levantar el explorer")
-    #print(explorer_as_dict)
-    explorer.load(explorer_as_dict)
-    #print(explorer_as_dict)
-    #print(explorer.save())
-    print("Explorer loaded")
+    try:
+        explorer.load(explorer_as_dict)
+    except:
+        print("Algo salió mal con la carga del explorer")
 
     # get triggered event from callback_context
     ctx = dash.callback_context
@@ -346,40 +334,31 @@ def update_explorer(zoomin_nclicks, keys, n_clusters, explorer_as_dict, stored_d
     # Filtrado
     if ctx.triggered:
         trigger_id = ctx.triggered[0]['prop_id'].split('.')[0]
+
         if trigger_id == 'slider_num_clusters':
-            print("Entró al cluster del explorer")
             explorer.cluster(n_clusters)
-            print("Salió del cluster")
-            #print(explorer.save())
+
         if trigger_id == 'btn-zoomin':
-            explorer.zoom_in(selected_cluster)
+            explorer.zoomin_then_cluster(selected_cluster, n_clusters)
+
+        if trigger_id == 'btn-undo':
+            explorer.undo()
+
+        if trigger_id == 'btn-restore':
+            explorer.restore()
             explorer.cluster(n_clusters)
+
         if trigger_id == 'filtros-dropdown':
             # Estoy prácticamente seguro de que esta lógica se puede encapsular dentro del explorer, deuda técnica
             if keys is not None:
-                #if explorer.actual_state.filters is not None:
-                    # Primero hay que deshacer el último filter para pasar correctamente los filtros
-
-                #    print("Undoing command")
-                #    print(explorer.save())
-                #    explorer.undo()
-                #    print("Undone command")
-                #    print(explorer.actual_state.__dict__())
-                #dataset = dataset.loc[explorer.actual_state.indexes]
-                print("Por generar los filtros")
                 dict_filtros = generar_filtros(dataset, keys)
-                print("Filtros generados")
                 explorer.apply_filter(dict_filtros)
-                print("Explorer terminó de aplicar filtros")
 
-    #print(stored)
-    print("Explorer que devolvemos")
-    print(explorer.save())
     return explorer.save(),
 
 @app.callback(
     [Output(component_id='btn-zoomin', component_property='disabled'),
-     Output(component_id='btn-zoomout', component_property='disabled'),
+     Output(component_id='btn-undo', component_property='disabled'),
      Output(component_id='btn-restore', component_property='disabled'),
      Output(component_id='cluster_seleccionado', component_property='options'),
      Output(component_id='cluster_seleccionado', component_property='value'),
@@ -392,31 +371,28 @@ def manage_ui_controls(explorer_as_dict):
     explorer = core.ParetoFrontExplorer()
     try:
         explorer.load(explorer_as_dict)
-        print("Cargó el explorer")
-        print("Este es el explorer cargado:\n{}".format(explorer.save()))
     except Exception as ex:
-        print("Algo salió mal\n{}".format(ex))
+        print("Algo salió mal durante la carga del explorer\n{}".format(ex))
 
     cluster_seleccionado_options = no_update
     zoomin_disabled = False
-    zoomout_disabled = True
+    undo_disabled = True
     restore_disabled = True
     cluster_seleccionado_value = None
 
     if explorer.actual_state.clusters is not None:
-        clusters_set = set(explorer.actual_state.clusters.values())
-        clusters_count = {c: list(explorer.actual_state.clusters.values()).count(c) for c in clusters_set}
-        cluster_seleccionado_options = [{'label': 'Cluster{}'.format(c), 'value': c, 'disabled': (clusters_count[c] <= 2)}
+        clusters_set = {explorer.actual_state.clusters[idx] for idx in explorer.actual_state.indexes}
+        cluster_seleccionado_options = [{'label': 'Cluster{}'.format(c), 'value': c, 'disabled': not explorer.can_zoomin(c)}
                                         for c in clusters_set]
 
-        zoomin_disabled = all([option['disabled'] for option in cluster_seleccionado_options])
+        zoomin_disabled = len(clusters_set) <= 1 or all([option['disabled'] for option in cluster_seleccionado_options])
         cluster_seleccionado_value = None if zoomin_disabled else [option['value'] for option in cluster_seleccionado_options][0]
-        zoomout_disabled = explorer.actual_state.level == 0
-        restore_disabled = explorer.actual_state.level == 0
+        undo_disabled = not explorer.can_undo()
+        restore_disabled = not explorer.can_restore()
 
     slider_nivel_marks = {i:str(i) for i in range(explorer.actual_state.level+1)}
 
-    return zoomin_disabled, zoomout_disabled, restore_disabled, cluster_seleccionado_options, cluster_seleccionado_value, slider_nivel_marks, explorer.actual_state.level
+    return zoomin_disabled, undo_disabled, restore_disabled, cluster_seleccionado_options, cluster_seleccionado_value, slider_nivel_marks, explorer.actual_state.level
 
 
 @app.callback(
@@ -429,27 +405,22 @@ def manage_ui_controls(explorer_as_dict):
 )
 
 def test_table(stored_data, explorer_as_dict, requirements, stakeholders):
-    print("Test_Table")
     dataset = pd.DataFrame(stored_data)
-    #requirements = pd.DataFrame(stored_requirements)
-    #stakeholders = pd.DataFrame(stored_stakeholders)
     explorer = core.ParetoFrontExplorer()
-    #print("Explorer: {}".format(explorer_as_dict))
+
     try:
         explorer.load(explorer_as_dict)
-        print("Cargó el explorer")
-        print("Este es el explorer cargado:\n{}".format(explorer.save()))
     except Exception as ex:
-        print("Algo salió mal\n{}".format(ex))
+        print("Algo salió mal durante la carga del test_table\n{}".format(ex))
 
     dataset = dataset.loc[explorer.actual_state.indexes]
 
     # si clusters está disponible en el estado agregarlo como última columna
 
     if explorer.actual_state.clusters is not None:
-        print("Entró a agregar la columna de clusters en la tabla")
+
         dataset["clusters"] = [explorer.actual_state.clusters[idx] for idx in dataset.index]
-        print("Salió de agregar la columna de clusters en la tabla")
+
 
     datatable = dataset.sort_values(by=['id'], inplace=False).to_dict('records')
 
@@ -473,7 +444,6 @@ def test_table(stored_data, explorer_as_dict, requirements, stakeholders):
         if i == "id":
             col_options["type"] = "numeric"
         datacolumns.append(col_options)
-    #print(datacolumns)
 
     # Ojo que tal vez hay que hacer un no_update si el último comando no actualizó indexes
     return datatable, datacolumns
@@ -485,25 +455,19 @@ def test_table(stored_data, explorer_as_dict, requirements, stakeholders):
 )
 def plot_profit_cost_graph(stored_data, explorer_as_dict):
     dataset = pd.DataFrame(stored_data)
-    # requirements = pd.DataFrame(stored_requirements)
-    # stakeholders = pd.DataFrame(stored_stakeholders)
     explorer = core.ParetoFrontExplorer()
-    # print("Explorer: {}".format(explorer_as_dict))
+
     try:
         explorer.load(explorer_as_dict)
-        print("Cargó el explorer")
-        print("Este es el explorer cargado:\n{}".format(explorer.save()))
     except Exception as ex:
-        print("Algo salió mal\n{}".format(ex))
+        print("Algo salió mal durante la carga del explorer\n{}".format(ex))
 
     dataset = dataset.loc[explorer.actual_state.indexes]
 
     # si clusters está disponible en el estado agregarlo como última columna
 
     if explorer.actual_state.clusters is not None:
-        print("Entró a agregar la columna de clusters en la tabla")
         dataset["clusters"] = [str(explorer.actual_state.clusters[idx]) for idx in dataset.index]
-        print("Salió de agregar la columna de clusters en la tabla")
 
     pcg = px.scatter(dataset, x="profit", y="cost", color="clusters", hover_data=['id'], color_discrete_sequence=['#d73027', '#fc8d59', '#fee090', '#4575b4', '#91bfdb'])
     pcg.update_layout(margin=dict(l=0, r=0, b=0, t=0))
@@ -515,13 +479,11 @@ def plot_profit_cost_graph(stored_data, explorer_as_dict):
 )
 def plot_dendrogram(explorer_as_dict):
     explorer = core.ParetoFrontExplorer()
-    # print("Explorer: {}".format(explorer_as_dict))
+
     try:
         explorer.load(explorer_as_dict)
-        print("Cargó el explorer")
-        print("Este es el explorer cargado:\n{}".format(explorer.save()))
     except Exception as ex:
-        print("Algo salió mal\n{}".format(ex))
+        print("Algo salió mal durante la carga del explorer en plot_dendrogram\n{}".format(ex))
 
     dn = ff.create_dendrogram(explorer.actual_state.linkage_matrix)
 
@@ -538,25 +500,19 @@ def plot_dendrogram(explorer_as_dict):
 )
 def plot_boxplot_graph(stored_data, explorer_as_dict, y_input):
     dataset = pd.DataFrame(stored_data)
-    # requirements = pd.DataFrame(stored_requirements)
-    # stakeholders = pd.DataFrame(stored_stakeholders)
     explorer = core.ParetoFrontExplorer()
-    # print("Explorer: {}".format(explorer_as_dict))
+
     try:
         explorer.load(explorer_as_dict)
-        print("Cargó el explorer")
-        print("Este es el explorer cargado:\n{}".format(explorer.save()))
     except Exception as ex:
-        print("Algo salió mal\n{}".format(ex))
+        print("Algo salió mal durante la carga del explorer en el plot_boxplot_graph\n{}".format(ex))
 
     dataset = dataset.loc[explorer.actual_state.indexes]
 
     # si clusters está disponible en el estado agregarlo como última columna
 
     if explorer.actual_state.clusters is not None:
-        print("Entró a agregar la columna de clusters en la tabla")
         dataset["clusters"] = [explorer.actual_state.clusters[idx] for idx in dataset.index]
-        print("Salió de agregar la columna de clusters en la tabla")
 
     fig = px.box(dataset, x="clusters", y=y_input)
 
@@ -570,18 +526,14 @@ def plot_boxplot_graph(stored_data, explorer_as_dict, y_input):
      Input(component_id='store-explorer', component_property='data')]
 )
 def write_statistics(stored_data, explorer_as_dict):
-    print("Write Statistics")
+
     dataset = pd.DataFrame(stored_data)
-    # requirements = pd.DataFrame(stored_requirements)
-    # stakeholders = pd.DataFrame(stored_stakeholders)
     explorer = core.ParetoFrontExplorer()
-    # print("Explorer: {}".format(explorer_as_dict))
+
     try:
         explorer.load(explorer_as_dict)
-        print("Cargó el explorer")
-        print("Este es el explorer cargado:\n{}".format(explorer.save()))
     except Exception as ex:
-        print("Algo salió mal\n{}".format(ex))
+        print("Algo salió mal durante la carga del explorer\n{}".format(ex))
 
     dataset = dataset.loc[explorer.actual_state.indexes]
 
@@ -590,12 +542,10 @@ def write_statistics(stored_data, explorer_as_dict):
     if explorer.actual_state.clusters is None:
         raise dash.exceptions.PreventUpdate("Can't calc statistics if clusters is not set")
     else:
-        print("Entró a agregar la columna de clusters en la tabla")
         dataset["clusters"] = [explorer.actual_state.clusters[idx] for idx in dataset.index]
-        print("Salió de agregar la columna de clusters en la tabla")
         stats = dataset[["id", "clusters", "cost", "profit"]].groupby("clusters").agg({'id': 'count',
-                                                                                         'profit': ['min', 'median', 'max', 'std'],
-                                                                                         'cost':['min', 'median', 'max', 'std']})
+                                                                                       'profit': ['min', 'median', 'max', 'std'],
+                                                                                       'cost':['min', 'median', 'max', 'std']})
         stats.columns = ['_'.join(col) for col in stats.columns.values]
 
         stats = stats.reset_index(names="cluster") # Para que se vea el número de cluster
@@ -616,16 +566,12 @@ def write_statistics(stored_data, explorer_as_dict):
 )
 def plot_treemaps_graphs(stored_data, explorer_as_dict, requirements, stakeholders):
     dataset = pd.DataFrame(stored_data)
-    # requirements = pd.DataFrame(stored_requirements)
-    # stakeholders = pd.DataFrame(stored_stakeholders)
     explorer = core.ParetoFrontExplorer()
-    # print("Explorer: {}".format(explorer_as_dict))
+
     try:
         explorer.load(explorer_as_dict)
-        print("Cargó el explorer")
-        print("Este es el explorer cargado:\n{}".format(explorer.save()))
     except Exception as ex:
-        print("Algo salió mal\n{}".format(ex))
+        print("Algo salió mal durante la carga del explorer\n{}".format(ex))
 
     dataset = dataset.loc[explorer.actual_state.indexes]
 
@@ -634,17 +580,13 @@ def plot_treemaps_graphs(stored_data, explorer_as_dict, requirements, stakeholde
     if explorer.actual_state.clusters is None:
         raise dash.exceptions.PreventUpdate("Can't calc statistics if clusters is not set")
 
-    print("Entró a agregar la columna de clusters en la tabla")
     dataset["clusters"] = [explorer.actual_state.clusters[idx] for idx in dataset.index]
-    print("Salió de agregar la columna de clusters en la tabla")
 
     tmreq = plot_treemaps(dataset, "reqs", requirements, explorer.actual_state.level)
     tmstk = plot_treemaps(dataset, "stks", stakeholders, explorer.actual_state.level)
 
     fig = make_subplots(
         2, NCLUSTERS := len(tmreq.keys()),
-        #column_widths=[1./NCLUSTERS for _ in range(NCLUSTERS)],
-        #subplot_titles=([cluster for cluster in tmreq.keys()] + [cluster for cluster in tmstk.keys()]),
         specs=[[{'type':'domain'} for _ in range(NCLUSTERS)] for _ in range(2)],
         horizontal_spacing=0.01,
         vertical_spacing=0.05
