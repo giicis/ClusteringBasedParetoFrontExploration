@@ -14,7 +14,7 @@ import time
 
 from dash import no_update
 from plotly.subplots import make_subplots
-from scipy.cluster.hierarchy import linkage, dendrogram, cut_tree, fcluster
+from scipy.cluster.hierarchy import linkage
 from scipy.spatial.distance import squareform, pdist
 
 import json
@@ -114,7 +114,8 @@ def plot_treemaps(dataset, dim, categorias, nivel):
         labels = ids
         parents = ["Cluster {}".format(c) for _ in ids]
         values = [count for _, count in quantified_keys_by_cluster.items() if count] #fuzzy cardinal
-        colors = [fuzziness_keys_by_cluster[(q, key)] for (q, key), count in quantified_keys_by_cluster.items() if count] # index of fuzziness
+        colors = [1. if (key.startswith('req') or key.startswith('customer')) else fuzziness_keys_by_cluster[(q, key)]/2. for (q, key), count in quantified_keys_by_cluster.items() if count]
+        customdata = [fuzziness_keys_by_cluster[(q, key)] for (q, key), count in quantified_keys_by_cluster.items() if count] # index of fuzziness
 
         treemap = go.Treemap(
             ids=ids,
@@ -130,7 +131,8 @@ def plot_treemaps(dataset, dim, categorias, nivel):
                 cmin=0.,
                 cmax=1.
             ),
-            hovertemplate='<b>%{label} </b> <br> Support: %{value}<br> Fuzziness: %{color:.2f}',
+            customdata=customdata,
+            hovertemplate='<b>%{label} </b> <br> Support: %{value}<br> Fuzziness: %{customdata:.2f}',
         )
 
         dict_treemaps[str(c)] = treemap
@@ -479,9 +481,12 @@ def plot_profit_cost_graph(stored_data, explorer_as_dict):
     Output(component_id='dendrogram_graph', component_property='figure'),
     [Input(component_id='store-explorer', component_property='data'),
      Input(component_id='show-ids-checkbox', component_property='value')
-     ]
+     ],
+    State(component_id='store-data', component_property='data')
 )
-def plot_dendrogram(explorer_as_dict, show_ids):
+def plot_dendrogram(explorer_as_dict, show_ids, stored_data):
+    dataset = pd.DataFrame(stored_data)
+
     explorer = core.ParetoFrontExplorer()
 
     try:
@@ -489,17 +494,32 @@ def plot_dendrogram(explorer_as_dict, show_ids):
     except Exception as ex:
         print("Algo salió mal durante la carga del explorer en plot_dendrogram\n{}".format(ex))
 
-    color_treshold = None
+    dn = None
     if explorer.actual_state.clusters is not None:
         n_clusters = len(set(explorer.actual_state.clusters.values()))
         pos = max(-n_clusters+1, -len(explorer.actual_state.linkage_matrix))
         color_treshold = explorer.actual_state.linkage_matrix[pos, 2] - 0.001
 
-    dn = ff.create_dendrogram(explorer.actual_state.linkage_matrix, linkagefun=lambda x: explorer.actual_state.linkage_matrix, color_threshold=color_treshold, colorscale=['#d73027', '#d81b60', '#ffc107', '#4575b4', '#fc8d59', '#1e88e5', '#91bfdb', '#fee090'])
+        # Must ignore filters
+        actual_state_without_filters = explorer.actual_state.__copy__()
+        actual_state_without_filters.filters = None
+        max_profit = max(dataset["profit"])
+        max_cost = max(dataset["cost"])
+        dataset = dataset.loc[actual_state_without_filters.indexes]
+        try:
+            dn = ff.create_dendrogram(dataset,
+                                  linkagefun=lambda x: explorer.actual_state.linkage_matrix,
+                                  distfun=lambda X:  squareform(pdist(X, lambda x, y: distance(x, y, max_profit, max_cost))),
+                                  color_threshold=color_treshold,
+                                  colorscale=['#d73027', '#d81b60', '#ffc107', '#4575b4', '#fc8d59', '#1e88e5', '#91bfdb', '#fee090'],
+                                  labels=list(dataset["id"])
+                                  )
+        except Exception as ex:
+            print(ex)
 
-    dn.update_xaxes(showticklabels=True if show_ids else False)
-    #dn.update_yaxes(showticklabels=False)
-    dn.update_layout(margin=dict(l=0, r=0, b=0, t=0))
+        dn.update_xaxes(showticklabels=True if show_ids else False)
+        #dn.update_yaxes(showticklabels=False)
+        dn.update_layout(margin=dict(l=0, r=0, b=0, t=0))
     return dn
 
 @app.callback(
@@ -609,6 +629,7 @@ def plot_treemaps_graphs(stored_data, explorer_as_dict, requirements, stakeholde
         fig.add_trace(tm, 2, i+1)
 
     fig.update_layout(margin=dict(t=15, l=5, r=5, b=15))
+    fig.update_traces(marker_showscale=False)
 
     return fig
 
